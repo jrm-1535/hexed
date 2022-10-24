@@ -1,0 +1,7 @@
+*~
+*.mod
+*.sum
+*.new
+*.txt
+specs/
+hexed
