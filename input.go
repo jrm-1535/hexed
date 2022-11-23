@@ -6,7 +6,19 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
 )
+/*
+type pendingOp int
+const (
+    NO_PENDING pendingOp = iota
+    PENDING_INSERT
+    PENDING_DEL
+    PENDING_BACKSPACE
+)
 
+func (pc *pageContext) getCaretPosition( ) int64 {
+    return pc.caretPos
+}
+*/
 const (
     NIBBLE = 1 + iota       // order is important: do not change
     LINE
@@ -80,6 +92,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     } else {
         pc.setOddCaretNoPending()
     }
+    pc.updateSearchPositionFromCaret()
 }
 
 /*  Nibble state machine: 8 states and 3 events (insert, delete, backspace)
@@ -731,7 +744,7 @@ const (
     KEYPAD_ENTER_KEY = gdk.KEY_KP_Enter
 
     DELETE_KEY = gdk.KEY_Delete
-    BACKSPACE_KEY = 0xff08
+    BACKSPACE_KEY = 0xff08  // TODO: use gdk.KEY_xxx
 
     HOME_KEY = 0xff50
     END_KEY = 0xff57
@@ -792,6 +805,8 @@ func editAtCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
     default:
         if hex, nibble := getNibbleFromKey( keyVal ); hex {
             pc.insCommand( nibble )
+        } else {
+            return false
         }
     }
     pc.canvas.QueueDraw( )    // force redraw
@@ -813,6 +828,8 @@ func getNibbleFromKey( keyVal uint ) (hex bool, nibble byte) {
         }
     } else if keyVal & 0xfff0 == 0xffb0 {           // num from keypad
         nibble = byte(keyVal & 0x0f)
+    } else {
+        return
     }
     hex = true
     return

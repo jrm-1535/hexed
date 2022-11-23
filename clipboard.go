@@ -76,6 +76,17 @@ func (hcp *hexClipboard)size() ( n int64 ) {
     return
 }
 
+func getNibbleFromHexDigit( hc byte ) (nibble byte) {
+    if hc >= 'a' {
+        nibble = hc - ('a'-10)
+    } else if hc >= 'A' {
+        nibble = hc - ('A'-10)
+    } else {
+        nibble = hc - ('0')
+    }
+    return
+}
+
 // TODO: when using WaitForContent with binary data (application/octet-stream) 
 // as content target, return directly 1 binary byte
 func (hcp *hexClipboard)get() byte {
@@ -89,33 +100,40 @@ func (hcp *hexClipboard)get() byte {
     if hcp.extraValid && hcp.index == 2 {
         b = hcp.extraByte >> 4
     } else {
-        nibble := hcp.data[hcp.index]
+        b = getNibbleFromHexDigit( hcp.data[hcp.index] )
         hcp.index++
-
-        if nibble >= 'a' {
-            b = nibble - ('a'-10)
-        } else if nibble >= 'A' {
-            b = nibble - ('A'-10)
-        } else {
-            b = nibble - ('0')
-        }
     }
     b <<= 4
     if hcp.extraValid && hcp.index == (2 * l) {
         b += hcp.extraByte & 0x0f
     } else {
-        nibble := hcp.data[hcp.index]
+        b += getNibbleFromHexDigit( hcp.data[hcp.index] )
         hcp.index++
-
-        if nibble >= 'a' {
-            b += nibble - ('a'-10)
-        } else if nibble >= 'A' {
-            b += nibble - ('A'-10)
-        } else {
-            b += nibble - ('0')
-        }
     }
     return b
+}
+
+func getHexDigitFromNibble( nibble byte ) (hd byte) {
+
+    if nibble < 10 {
+        hd = '0' + nibble
+    } else {
+        hd = ('a'-10) + nibble
+    }
+    return
+}
+
+// write hex digits in out slice, from the source data bytes
+// out must have been properly allocated for the data source:
+// slice of length & capacity == len(data) * 2
+func writeHexDigitsFromSlice( out []byte, data []byte ) {
+    for i := 0; i < len(data); i++ {
+        db := data[i]
+        j := i << 1
+        out[j] = getHexDigitFromNibble( db >> 4 )
+        j++
+        out[j] = getHexDigitFromNibble( db & 0x0f )
+    }
 }
 
 // save binary data into hex chars, prefixed with "0x"
@@ -126,25 +144,7 @@ func setClipboardData( data []byte ) {
     b := make( []byte, (l+1) * 2 )  // 0x + 2 char per data byte
     b[0] = '0'
     b[1] = 'x'
-    for i := 0; i < l; {
-        db := data[i]
-        nibble := db >> 4
-        i++
-        j := i << 1
-        if nibble < 10 {
-            b[j] = '0' + nibble
-        } else {
-            b[j] = ('a'-10) + nibble
-        }
-        j ++
-        nibble = db & 0x0f
-        if nibble < 10 {
-            b[j] = '0' + nibble
-        } else {
-            b[j] = ('a'-10) + nibble
-        }
-    }
-//    fmt.Printf( "setClipboardData: %s\n", string(b) )
+    writeHexDigitsFromSlice( b[2:], data )
     clipBoard.cb.SetText( string(b) )
     pasteDataExists( true )
 }

@@ -14,6 +14,8 @@ const (
 
     dateFormat = iota
 
+    emptyFile
+
     textReadOnly
     textReadWrite
 
@@ -74,6 +76,9 @@ const (
     menuEditSelect
     menuEditSelectHelp
 
+    menuEditExplore
+    menuEditExploreHelp
+
     menuEditPreferences
     menuEditPreferencesHelp
 
@@ -99,6 +104,8 @@ const (
 
     buttonGo
     buttonFind
+    buttonNext
+    buttonPrevious
 
     warningCloseFile
     gotoPrompt
@@ -124,6 +131,8 @@ var languages [languageNumber]string = [languageNumber]string {
 
 var englishRes [arrayLength]string = [arrayLength]string {
     "01/02/2006 03:04:05PM",                                // dateFormat
+
+    "Unnamed document",                                     // emptyFile
 
     " READ ONLY",                                           // textReadOnly
     "READ WRITE",                                           // textReadWrite
@@ -185,6 +194,9 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Select All",                                           // menuEditSelect
     "select the entire document",                           // menuEditSelectHelp
 
+    "Explore",                                              // menuEditExplore
+    "explore the current selection",                        // menuEditExploreHelp
+
     "Preferences",                                          // menuEditPreferences
     "setup preferences",                                    // menuEditPreferencesHelp
 
@@ -196,6 +208,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Go to",                                                // menuSearchGoto
     "move to the given byte location",                      // menuSearchGotoHelp
+
 
     "Contents",                                             // menuHelpContent
     "show Hexed manual",                                    // menuHelpContentHelp
@@ -209,6 +222,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Close without saving",                                 // buttonCloseWithoutSave
     "Go",                                                   // buttonGo
     "Find",                                                 // buttonFind
+    "Next",                                                 // buttonNext
+    "Previous",                                             // buttonPrevious
 
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
@@ -221,6 +236,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
 var frenchRes [arrayLength]string = [arrayLength]string {
     "02-01-2006 15:04:05",                                  // dateFormat
+
+    "document sans nom",                                    // emptyFile
 
     "lecture",                                              // textReadOnly
     "ecriture",                                             // textReadWrite
@@ -282,6 +299,9 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Selecter tout",                                        // menuEditSelect
     "sélecte the document complet",                         // menuEditSelectHelp
 
+    "Explorer",                                             // menuEditExplore
+    "explorer la selection",                                // menuEditExploreHelp
+
     "Préférences",                                          // menuEditPreferences
     "configure l'application",                              // menuEditPreferencesHelp
 
@@ -306,6 +326,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Fermer sans enregistrer",                              // buttonCloseWithoutSave
     "Aller",                                                // buttonGo
     "chercher",                                             // buttonFind
+    "Suivant",                                              // buttonNext
+    "Précédent",                                            // buttonPrevious
 
     "Si vous fermez sans enregister, toutes les modifications seront perdues",  // warningCloseFile
     "Entrez l'adresse de l'octet en hexadecimal",           // gotoPrompt

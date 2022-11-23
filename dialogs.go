@@ -98,12 +98,12 @@ func hexFilter( entry *gtk.Entry, event *gdk.Event ) bool {
     case HOME_KEY, END_KEY, LEFT_KEY, RIGHT_KEY,
          INSERT_KEY, BACKSPACE_KEY, DELETE_KEY,
          ENTER_KEY, KEYPAD_ENTER_KEY:
-        fmt.Printf("Got Special key %#x\n", key)
+//        fmt.Printf("Got Special key %#x\n", key)
         return false
 
     default:
         if hex, _ := getNibbleFromKey( key ); hex {
-            fmt.Printf("Got key %#x\n", key)
+//            fmt.Printf("Got key %#x\n", key)
             return false
         }
         return true

@@ -22,6 +22,7 @@ var (
 //    window          *gtk.ApplicationWindow  // a single window made of
     window          *gtk.Window
     menus           *menu                   // a menu bar
+
     mainArea        *workArea               // a main work area
 
     statusBar       *gtk.Statusbar          // a status bar
@@ -122,6 +123,11 @@ func closeCurrentPage( ) {
     }
 }
 
+func showWindow() {
+    window.ShowAll()
+    hideSearchArea()
+}
+
 func temporarilySetReadOnly( readOnly bool ) {
     pc := getCurrentWorkAreaPageContext( )
     pc.setTempReadOnly( readOnly )
@@ -142,6 +148,15 @@ func showMenuHint( hint string ) {
 
 func removeMenuHint( ) {
     statusBar.Pop( menuHintId )
+}
+
+func showApplicationStatus( status string ) {
+    statusBar.RemoveAll( appStatusId )
+    statusBar.Push( appStatusId, status )
+}
+
+func removeApplicationStatus( ) {
+    statusBar.Pop( appStatusId )
 }
 
 func showPosition( pos string ) {
@@ -248,12 +263,14 @@ func newPage( pathName string, readOnly bool ) {
     var label *gtk.Label
     var name string
 
-fmt.Printf("newPage: file \"%s\"\n", pathName )
     if pathName == "" {
-        name = "Unsaved document"   // TODO: add a document number
+        name = fmt.Sprintf( "%s", localizeText(emptyFile) )
+        // TODO: add an emptyFile number
     } else {
         name = filepath.Base( pathName )
+        // TODO: check if file is already opened in a page => do not create page
     }
+//    fmt.Printf("newPage: file \"%s\"\n", name )
     if label, err = gtk.LabelNew( name ); nil != err {
         log.Fatalf("newPage unable to create label %s: %v", name, err)
     }
@@ -262,7 +279,8 @@ fmt.Printf("newPage: file \"%s\"\n", pathName )
     // make sure appendPage is called before activating pageContent
     context.activate( )
 
-    window.ShowAll()
+    showWindow()
+
     mainArea.selectPage( index )
 
     pageExists( true )
@@ -363,11 +381,12 @@ func InitApplication( args *hexedArgs ) {
     window.Connect( "delete_event", exitApplication )
     window.SetTitle("hexed")
 
-    // create status area
-    statusArea := newStatusArea( )
-
     // create menus
     menuBar := buildMenus( )
+
+    // create search area
+    sarea := newSearchArea( )
+
     mainArea, err = newWorkArea( )
     if err != nil {
         log.Fatal( "Unable to create workarea: ", err )
@@ -376,12 +395,16 @@ func InitApplication( args *hexedArgs ) {
 //    fmt.Printf( "new work area: %p\n", workBench )
     width, height := getPageDefaultSize( )
 
+    // create status area
+    statusArea := newStatusArea( )
+
     // Assemble the window
     windowBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
     if err != nil {
         log.Fatalf( "Unable to create a window box: %v\n", err )
     }
     windowBox.PackStart( menuBar, false, false, 0 )
+    windowBox.PackStart( sarea, false, false, 0 )
     windowBox.PackStart( mainArea.getBin(), true, true, 1 )
 //    windowBox.PackEnd( p.sBar, false, false, 1 )
     windowBox.PackStart( statusArea, false, false, 0 )
@@ -391,8 +414,7 @@ func InitApplication( args *hexedArgs ) {
     window.SetPosition(gtk.WIN_POS_MOUSE)
     window.SetResizable( true )
     window.SetDefaultSize(width, height)
-
-    window.ShowAll()
+    showWindow()
 
     err = initClipboard( )
     if err != nil {

@@ -82,8 +82,11 @@ const (
 )
 
 type areaContext struct {
-    bgPattern           *cairo.Pattern
-    fgPattern           *cairo.Pattern
+    bgPattern,
+    fgPattern,
+    selPattern,
+    findPattern,
+    atCaretPattern  *cairo.Pattern
 }
 
 func (pc *pageContext)setAddContext( ) (err error) {
@@ -93,6 +96,7 @@ func (pc *pageContext)setAddContext( ) (err error) {
         return
     }
     pc.add.fgPattern, err = cairo.NewPatternFromRGB( 0.66, 0.58, 0.0 )
+    // no selection or find patterns in addresses
     return
 }
 
@@ -103,6 +107,18 @@ func (pc *pageContext)setHexContext( ) (err error) {
         return
     }
     pc.hex.fgPattern, err = cairo.NewPatternFromRGB( 0.96, 0.66, 0.0 )
+    if err != nil {
+        return
+    }
+    pc.hex.selPattern, err = cairo.NewPatternFromRGB( 0.0, 0.4, 0.1 )
+    if err != nil {
+        return
+    }
+    pc.hex.findPattern, err = cairo.NewPatternFromRGB(  0.1, 0.1, 0.6 )
+    if err != nil {
+        return
+    }
+    pc.hex.atCaretPattern, err = cairo.NewPatternFromRGB( 0.6, 0.0, 0.6 )
     return
 }
 
@@ -113,6 +129,18 @@ func (pc *pageContext)setAscContext( ) (err error) {
         return
     }
     pc.asc.fgPattern, err = cairo.NewPatternFromRGB( 0.96, 0.58, 0.0 )
+    if err != nil {
+        return
+    }
+    pc.asc.selPattern, err = cairo.NewPatternFromRGB( 0.2, 0.4, 0.0 )
+    if err != nil {
+        return
+    }
+    pc.asc.findPattern, err = cairo.NewPatternFromRGB(  0.1, 0.1, 0.6 )
+    if err != nil {
+        return
+    }
+    pc.asc.atCaretPattern, err = cairo.NewPatternFromRGB( 0.6, 0.0, 0.6 )
     return
 }
 
@@ -124,27 +152,16 @@ const (
 )
     
 type selection struct {
-    region              area
     move                direction
     start, beyond       int64
     active              bool
-    bgPattern           *cairo.Pattern
 }
 
 func (pc *pageContext)initSelection( ) (err error) {
-    pc.sel.bgPattern, err = cairo.NewPatternFromRGB( 0.0, 0.4, 0.1 )
     pc.sel.start = -1
     pc.sel.beyond = -1
     return
 }
-
-type pendingOp int
-const (
-    NO_PENDING pendingOp = iota
-    PENDING_INSERT
-    PENDING_DEL
-    PENDING_BACKSPACE
-)
 
 type pageContext struct {
 
@@ -168,9 +185,12 @@ type pageContext struct {
     sel                 selection
     caretPos            int64       // in 1/2 byte within data bytes
 
+    search              bool
+    hideCaret           bool        // when area is not in focus (during search)
+
     replaceMode         bool        // false for insert mode
-    readOnly            bool        // false if file modification allowed
-    tempReadOnly        bool        // false if file modification is temporarily possible
+    readOnly            bool        // false if file modification can be allowed
+    tempReadOnly        bool        // false if file modification is allowed
 
     // data modification state machine in insert mode
     ins                 func( pc *pageContext, nibble byte )
@@ -220,12 +240,6 @@ fmt.Printf("cut selection s=%d, l=%d, caret=%d\n", s, l, pc.caretPos)
         pc.resetSelection( )
         pc.canvas.QueueDraw( )    // force redraw
     }
-}
-
-func printSelection( ) {
-    pc := getCurrentPageContext()
-    data := pc.store.getData( pc.sel.start, pc.sel.beyond )
-    fmt.Printf("Selection: %v (%s)\n", data, string(data))
 }
 
 func pasteClipboard( ) {
@@ -299,6 +313,27 @@ func selectAll( ) {
     pc.canvas.QueueDraw( )    // force redraw
 }
 
+func showHighlights( matchIndex int ) (moved bool) {
+    pc := getCurrentPageContext()
+    pc.search = len(matches) > 0
+fmt.Printf( "showHighlights: len(matches)=%d, matchIndex=%d\n",
+            len(matches), matchIndex )
+    if matchIndex >= 0 && matchIndex < len(matches) {
+        showApplicationStatus( fmt.Sprintf( "match %d of %d",
+                               matchIndex + 1, len(matches) ) )
+        pc.caretPos = matches[matchIndex] << 1
+        pc.scrollPositionUpdate( pc.caretPos )
+        pc.showBytePosition()
+        moved = true
+    }
+    pc.canvas.QueueDraw( )    // force redraw
+    return
+}
+
+func removeHighlights() {
+    removeApplicationStatus()
+}
+
 func ( pc *pageContext ) rowClip( n int, rY, cL, cH float64 ) ( y, h float64 ) {
     y = rY - cL
     if y < 0.0 {
@@ -319,30 +354,31 @@ func ( pc *pageContext ) rowClip( n int, rY, cL, cH float64 ) ( y, h float64 ) {
 
 type rectangle struct {
     x, y, w, h  float64
+    atCaret     bool
 }
 
 // get the selected area within the visible window. The selection is always
 // a single connected area that can span over multiple rows, which means that
 // it can require at most 3 rectangles to cover that area:
-//              [.......============]
-//              [===================]
-//              [===================]
-//              [===................]
+//               .......[===========]   first line rectangle
+//              [===================    \
+//               ===================    middle lines rectangle
+//               ===================]   /
+//              [===]...............   last line rectangle
 // Those rectangles are clipped to stay in the visible window.
-func ( pc *pageContext )getSelectionBoundingRectangles() ( rects []rectangle ) {
-//fmt.Printf("sel: %v\n", *sel)
-    // first locate in character matrix (col, row)
-    sel := &pc.sel
-    if sel.start == -1 {
-        return
-    }
+// Rectangles for both hex and asc area are updated at each call
+func (pc *pageContext) addBoundingRectangles(
+                               hexIr, ascIr []rectangle, atCaret bool,
+                               start, beyond int64 ) (hOr, aOr []rectangle ) {
+
+    hOr, aOr = hexIr, ascIr // by default, output is same as input
 
     nBytesLine := int64(pc.nBytesLine)
+    startRow := start / nBytesLine
+    stopRow := (beyond-1) / nBytesLine
+
     charHeight := int64(pc.font.charHeight)
     charDescent := int64(pc.font.charDescent)
-
-    startRow := sel.start / nBytesLine
-    stopRow := (sel.beyond-1) / nBytesLine
 
     startH := float64( charDescent - 2 + startRow * charHeight )
     stopH := float64( charDescent - 2 + (stopRow +1) * charHeight )
@@ -350,65 +386,120 @@ func ( pc *pageContext )getSelectionBoundingRectangles() ( rects []rectangle ) {
     adj := pc.barAdjust
     clipLow := adj.GetValue()
     clipHigh := clipLow + adj.GetPageSize()
-
     if stopH < clipLow || startH > clipHigh {
         return
     }
 
     charWidth := int64(pc.font.charWidth)
     addLen := int64(pc.addLen)
-    startCol := sel.start % nBytesLine
+    hexLen := addLen + (nBytesLine * 3)
+    startCol := start % nBytesLine
 
-    // first row is special
-    var r rectangle
-    r.y, r.h = pc.rowClip( 1, startH, clipLow, clipHigh )
-    if r.h != 0.0 {
-        r.x = float64( (addLen + 1 + (startCol * 3)) * charWidth )
+    var hr, ar rectangle    // first row is special
+    hr.atCaret = atCaret
+    ar.atCaret = atCaret
+
+    hr.y, hr.h = pc.rowClip( 1, startH, clipLow, clipHigh )
+    ar.y, ar.h = hr.y, hr.h
+
+    if hr.h != 0.0 {
+        hr.x = float64( (addLen + 1 + (startCol * 3)) * charWidth )
+        ar.x = float64( (hexLen + 1 + startCol) * charWidth )
         if stopRow == startRow {
-            r.w = float64((addLen + 3 + ((sel.beyond-1) % nBytesLine) * 3) *
-                                 charWidth ) - r.x
+            hr.w = float64((addLen + 3 + ((beyond-1) % nBytesLine) * 3) *
+                                 charWidth ) - hr.x
+            ar.w = float64((hexLen + 2 + ((beyond-1) % nBytesLine)) *
+                                 charWidth ) - ar.x
         } else {
-            r.w = float64((addLen + (nBytesLine * 3)) * charWidth) - r.x
+            hr.w = float64((addLen + (nBytesLine * 3)) * charWidth) - hr.x
+            ar.w = float64((hexLen + 1 + nBytesLine) * charWidth) - ar.x
         }
-        rects = append( rects, r )
+        hOr = append( hOr, hr )
+        aOr = append( aOr, ar )
     }
 
     n := stopRow-startRow
     if n != 0 {
         // all following rows except the last one
-        r.x = float64( (addLen + 1) * charWidth )
+        hr.x = float64( (addLen + 1) * charWidth )
+        ar.x = float64( (hexLen + 1) * charWidth )
         if n > 1 {
-            r.y, r.h = pc.rowClip( int(n-1), startH + float64( charHeight ),
+            hr.y, hr.h = pc.rowClip( int(n-1), startH + float64( charHeight ),
                                    clipLow, clipHigh )
-            if r.h != 0.0 {
-                r.w = float64((addLen + (nBytesLine * 3)) * charWidth) - r.x
-                rects = append( rects, r )
+            ar.y, ar.h = hr.y, hr.h
+            if hr.h != 0.0 {
+                hr.w = float64((addLen + (nBytesLine * 3)) * charWidth) - hr.x
+                ar.w = float64((hexLen + 1 + nBytesLine) * charWidth) - ar.x
+                hOr = append( hOr, hr )
+                aOr = append( aOr, ar )
             }
         }
         // last row
         startH += float64( n * charHeight )
-        r.y, r.h = pc.rowClip( 1, startH, clipLow, clipHigh )
-        if r.h != 0.0 {
-            r.w = float64((addLen + 3 + ((sel.beyond-1) % nBytesLine) * 3) *
-                                 charWidth ) - r.x
-            rects = append( rects, r )
+        hr.y, hr.h = pc.rowClip( 1, startH, clipLow, clipHigh )
+        ar.y, ar.h = hr.y, hr.h
+        if hr.h != 0.0 {
+            hr.w = float64((addLen + 3 + ((beyond-1) % nBytesLine) * 3) *
+                                 charWidth ) - hr.x
+            ar.w = float64((hexLen + 2 + (beyond-1) % nBytesLine) *
+                                 charWidth ) - ar.x
+            hOr = append( hOr, hr )
+            aOr = append( aOr, ar )
         }
     }
     return
 }
 
-func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down bool) {
-
-    hexStartX := (pc.addLen + 1 ) * pc.font.charWidth
-    if x < float64(hexStartX) {
-        return -1, false, false
+func ( pc *pageContext )getHighlightBoundingRectangles( ) (hr, ar []rectangle) {
+    for i := 0; i < len(matches); i++ {
+        hr, ar = pc.addBoundingRectangles( hr, ar, matches[i] == searchPos,
+                                          matches[i], matches[i] + matchSize )
     }
-    x -= float64(hexStartX)
-    hexWidth := pc.nBytesLine * 3 * pc.font.charWidth
-    if x >= float64(hexWidth) {
-        return -1, false, false
+    return
+}
+
+func ( pc *pageContext )getSelectionBoundingRectangles(
+                                         sel *selection ) (hr, ar []rectangle) {
+    if sel.start == -1 {
+        return
     }
 
+    hr, ar = pc.addBoundingRectangles( hr, ar, false, sel.start, sel.beyond )
+    return
+}
+
+func (pc *pageContext)getDataNibbleIndexFromHex( x float64,
+                                                 row int64 ) (index int64) {
+
+    hexIncX := 3 * pc.font.charWidth              // size of 1 hex byte on screen
+    byteCol := int64(x / float64(hexIncX))        // byte index in row
+    delta := x - float64(byteCol * int64(hexIncX))
+    var col int64                                 // nibble index
+
+    if delta <= float64(pc.font.charWidth) {
+        col = 2 * byteCol
+    } else {
+        col = 2 * byteCol + 1
+    }
+//fmt.Printf("getDataNibbleIndexFromHex: x=%f, hexInc=%d, byteCol=%d, delta=%f, col=%d, row=%d\n",
+//           x, hexIncX, byteCol, delta, col, row)
+    index = (row * 2 * int64(pc.nBytesLine)) + col
+    return
+}
+
+func (pc *pageContext)getDataNibbleIndexFromAsc( x float64,
+                                                 row int64 ) (index int64) {
+    ascIncX := pc.font.charWidth                  // size of 1 asc byte on screen
+    col := int64(x / float64(ascIncX)) << 1       // nibble index
+
+//fmt.Printf("getDataNibbleIndexFromAsc: x=%f, ascInc=%d, col=%d, row=%d\n",
+//           x, hexIncX, col, row)
+
+    index = (row * 2 * int64(pc.nBytesLine)) + col
+    return
+}
+
+func (pc *pageContext)getDataRow( y float64 ) (row int64, up, down bool ) {
 //    fmt.Printf( "x=%f, y=%f\n", x, y )
     if y < 0 {
         fmt.Printf( "move up (y = %f)\n", y )
@@ -422,27 +513,38 @@ func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down 
     if y > float64(pc.font.charDescent) {
         y -= float64(pc.font.charDescent)
     }
+    row = int64(y / float64(pc.font.charHeight)) // row index
+    return
+}
 
-    row := int64(y / float64(pc.font.charHeight)) // row index
+func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down bool) {
 
-    hexIncX := 3 * pc.font.charWidth              // size of 1 byte on screen
-    byteCol := int64(x / float64(hexIncX))        // byte index in row
-    delta := x - float64(byteCol * int64(hexIncX))
-    var col int64
-
-    if delta <= float64(pc.font.charWidth) {
-        col = 2 * byteCol
-    } else {
-        col = 2 * byteCol + 1
+    hexStartX := (pc.addLen + 1 ) * pc.font.charWidth
+    if x < float64(hexStartX) {
+        return -1, false, false
     }
-//    fmt.Printf("data Index: x=%f, y= %f, hexInc=%d, byteCol=%d, delta=%f, col=%d, row=%d\n",
-//                x, y, hexIncX, byteCol, delta, col, row)
+    x -= float64(hexStartX)
+
+    hexWidth := pc.nBytesLine * 3 * pc.font.charWidth
+    var row int64
+
+    if x >= float64(hexWidth) {
+        x -= float64(hexWidth)
+        ascWidth := pc.nBytesLine * pc.font.charWidth
+        if x >= float64(ascWidth) {
+            return -1, false, false
+        }
+        row, up, down = pc.getDataRow( y )
+        index = pc.getDataNibbleIndexFromAsc( x, row )
+    } else {
+        row, up, down = pc.getDataRow( y )
+        index = pc.getDataNibbleIndexFromHex( x, row )
+    }
     maxIndex := 2 * pc.store.length()
-    index = (row * 2 * int64(pc.nBytesLine)) + col
     if index > maxIndex {
         index = maxIndex
     }
-    return 
+    return
 }
 
 func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) {
@@ -453,9 +555,12 @@ func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) {
         return  // TODO: show popup action menu
     }
 
+    releaseSearchFocus( )
+    pc := getCurrentPageContext()
+    pc.setPageContentFocus()
+
     x := buttonEvent.X( )
     y := buttonEvent.Y( )
-    pc := getCurrentPageContext()
 
     modifier := gdk.ModifierType(buttonEvent.State())
     if 0 != modifier & gdk.SHIFT_MASK {
@@ -576,15 +681,53 @@ func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
     cr.SetOperator( cairo.OPERATOR_SOURCE )
     cr.SetSource( pc.add.bgPattern )
     cr.Paint( ) // temporarily - later add a rectangle for each area
-
-    rects := pc.getSelectionBoundingRectangles( )
-    cr.SetSource( pc.sel.bgPattern )
-    for _, r := range rects {
-//        fmt.Printf( "rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
+    hr, ar := pc.getSelectionBoundingRectangles( &pc.sel )
+    cr.SetSource( pc.hex.selPattern )
+    for _, r := range hr {
+//        fmt.Printf( "sel rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
+        cr.Rectangle( r.x, r.y, r.w, r.h )
+    }
+    cr.Fill( )
+    cr.SetSource( pc.asc.selPattern )
+    for _, r := range ar {
+//        fmt.Printf( "sel rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
         cr.Rectangle( r.x, r.y, r.w, r.h )
     }
     cr.Fill( )
 
+    if pc.search {
+        hr, ar = pc.getHighlightBoundingRectangles( )
+
+        for _, r := range hr {
+            if r.atCaret {
+                cr.SetSource( pc.hex.atCaretPattern )
+            } else {
+                cr.SetSource( pc.hex.findPattern )
+            }
+//            fmt.Printf( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
+//                        r.atCaret, r.x, r.y, r.w, r.h )
+            cr.Rectangle( r.x, r.y, r.w, r.h )
+            cr.Fill( )
+        }
+
+        for _, r := range ar {
+            if r.atCaret {
+if pc.asc.atCaretPattern == nil {
+    panic("pc.asc.atCaretPattern is nil\n")
+}
+                cr.SetSource( pc.asc.atCaretPattern )
+            } else {
+if pc.asc.findPattern == nil {
+    panic("pc.asc.findPattern is nil\n")
+}
+                cr.SetSource( pc.asc.findPattern )
+            }
+            fmt.Printf( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
+                        r.atCaret, r.x, r.y, r.w, r.h )
+            cr.Rectangle( r.x, r.y, r.w, r.h )
+            cr.Fill( )
+        }
+    }
 }
 
 func (pc *pageContext) scrollPositionFollowPage( pos int64, pagePos float64 ) {
@@ -893,7 +1036,7 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
         xStart += xInc
     }
 
-    if pc.sel.start == -1 {
+    if pc.sel.start == -1 && ! pc.hideCaret {
         drawCaret( pc, cr,  )
     }
 }
@@ -909,6 +1052,7 @@ func (pc *pageContext)setStorage( path string ) (err error) {
     }
     pc.store, err = initStorage( path )
     if err == nil {
+        pc.store.setNotifyDataChange( updateSearch )
         pc.store.setNotifyLenChange( updateStoreLength )
         pc.store.setNotifyUndoRedoAble( undoRedoUpdate )
         dataExists( pc.store.length() > 0 )
@@ -921,9 +1065,10 @@ func reloadPageContent( path string ) {
     err := pc.store.reload( path )
     if err == nil {
         pc.showBytePosition()
-        dataExists( pc.store.length( ) > 0 )
-        undoRedoUpdate( false, false )
+//        dataExists( pc.store.length( ) > 0 )
+//        undoRedoUpdate( false, false )
         pc.setCaretPosition( -1, END )  // set caret at 0
+//        pc.findPattern( false )
         pc.canvas.QueueDraw( )          // force redraw
     }
 }
@@ -956,6 +1101,8 @@ func (pc *pageContext) refresh( ) {
     undoRedoUpdate( pc.store.areUndoRedoPossible() )
     // protection switch depends on read only status
     modificationAllowed( ! pc.readOnly, ! pc.tempReadOnly )
+    // update pattern matches
+    pc.findPattern( )
 }
 
 func (pc *pageContext) setTempReadOnly( readOnly bool ) {
@@ -969,11 +1116,8 @@ func (pc *pageContext) setTempReadOnly( readOnly bool ) {
         showInputMode( pc.tempReadOnly, pc.replaceMode )
         clipboardAvail, _ := isClipboardDataAvailable()
         pasteDataExists( clipboardAvail )
+        selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
     }
-}
-
-func findInCurrentPage( toSearch string ) {
-    fmt.Printf("Searching for \"%s\"\n", toSearch)
 }
 
 func (pc *pageContext) isPageModified( ) bool {
@@ -1086,6 +1230,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     if err = pc.initSelection( ); err != nil {
         return
     }
+    pc.search = false
 
     if pc.canvas, err = gtk.DrawingAreaNew(); err != nil {
         return
@@ -1129,6 +1274,23 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
 
 func (pc *pageContext)setPageContentFocus( ) {
     pc.canvas.GrabFocus( )
+    pc.hideCaret = false
+}
+
+func transferFocus( maxLen int64 ) ( sel []byte ) {
+    pc := getCurrentWorkAreaPageContext()
+    if pc != nil {
+        pc.hideCaret = true
+        if maxLen > 0 {
+            s, l := pc.getSelection()
+            if s != -1 {
+                if l > maxLen { l = maxLen }
+                sel = pc.store.getData( s, s + l )
+            }
+        }
+        pc.canvas.QueueDraw( )          // force redraw
+    }
+    return
 }
 
 // split from init to allow signals access to global context

@@ -37,7 +37,7 @@ func initActions( nItems int ) {
     actions["revert"] = revertCurrentPage
     actions["close"] = closeCurrentPage
 
-    actions["quit"] = gtk.MainQuit
+    actions["exit"] = gtk.MainQuit
 
     actions["undo"] = undoLast
     actions["redo"] = redoLast
@@ -51,7 +51,7 @@ func initActions( nItems int ) {
     actions["copy"] = copySelection
     actions["paste"] = pasteClipboard
     actions["delete"] = deleteSelection
-    actions["select"] = selectAll
+    actions["selectAll"] = selectAll
 
     preferencesAction := func ( ) {
         fmt.Printf( "preferences called\n" )
@@ -66,6 +66,8 @@ func initActions( nItems int ) {
     }
     actions["language"] = languageAction
 
+    actions["find"] = search
+
     gotoAction := func( ) {
         fmt.Printf( "goto called\n" )
         op, pos := gotoDialog()
@@ -73,24 +75,15 @@ func initActions( nItems int ) {
             gotoPos( pos )
         }
     }
-
-    findAction := func( ) {
-        fmt.Printf( "Find called\n" )
-        op, toSearch := findDialog()
-        if op == DO && len(toSearch) >= 0 {
-            findInCurrentPage( toSearch )
-        }
-    }
     actions["goto"] = gotoAction
-    actions["find"] = findAction
 
     helpAction := func ( ) {
-        fmt.Printf( "help called\n" )
+        fmt.Printf( "help content called\n" )
     }
-    actions["help"] = helpAction
+    actions["contents"] = helpAction
 
     aboutAction := func( ) {
-        fmt.Printf( "about called\n" )
+        fmt.Printf( "help about called\n" )
 //        aboutDialog( )
 //        refreshMenus()
     }
@@ -114,14 +107,14 @@ func fileExists( state bool ) {
 }
 
 func dataExists( state bool ) {
-    enableMenuItem( "select", state )
+    enableMenuItem( "selectAll", state )
     enableMenuItem( "saveAs", state )
     enableMenuItem( "find", state )
     enableMenuItem( "goto", state )
 }
 
 func pasteDataExists( state bool ) {
-    enableMenuItem( "paste", isCurrentPageWritable() )
+    enableMenuItem( "paste", state && isCurrentPageWritable() )
 }
 
 func selectionDataExists( enableState bool, readOnly bool ) {

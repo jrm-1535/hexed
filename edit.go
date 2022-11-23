@@ -44,6 +44,7 @@ type storage struct {
     cutData             []byte          // deleted/replaced data (for redo)
     stack               []operation     // UNDO-REDO stack
     top                 int             // stack pointer
+    notifyDataChange    func( )
     notifyLenChange     func( l int64 )
     notifyUndoRedo      func( u, r bool )
 }
@@ -82,6 +83,10 @@ func (s *storage) setNotifyLenChange( f func( int64 ) ) {
 
 func (s *storage) setNotifyUndoRedoAble( f func( u, r bool ) ) {
     s.notifyUndoRedo = f
+}
+
+func (s *storage) setNotifyDataChange( f func() ) {
+    s.notifyDataChange = f
 }
 
 // return current storage content
@@ -127,7 +132,17 @@ func (s *storage)reload( path string ) error {
     s.cutData = nil
     s.stack = make( []operation, 0, defUndoSize )
     s.top = 0
-    s.curData, err = os.ReadFile( path )
+    if s.curData, err = os.ReadFile( path ); err == nil {
+        if s.notifyDataChange != nil {
+            s.notifyDataChange()
+        }
+        if s.notifyUndoRedo != nil {
+            s.notifyUndoRedo( s.top > 0, true )
+        }
+        if s.notifyLenChange != nil {
+            s.notifyLenChange( int64(len(s.curData)) )
+        }
+    }
     return err
 }
 
@@ -158,7 +173,10 @@ func (s *storage) undo( ) (pos, tag int64, err error) {
     }
 
     s.top --                // pop undo stack (and push into redo stack)
-    s.notifyUndoRedo( s.top > 0, true )
+
+    if s.notifyUndoRedo != nil {
+        s.notifyUndoRedo( s.top > 0, true )
+    }
 
     op := s.stack[s.top]
 
@@ -203,7 +221,9 @@ func (s *storage) redo( ) (pos, tag int64, err error) {
     op := s.stack[s.top]
     s.top ++                // pop redo stack (and push into undo stack)
 
-    s.notifyUndoRedo( true, s.top < len( s.stack) )
+    if s.notifyUndoRedo != nil {
+        s.notifyUndoRedo( true, s.top < len( s.stack) )
+    }
 
     cmd := op.cmd
     pos = op.position
@@ -361,6 +381,9 @@ func (s *storage) insertInCurData( pos, tag int64, data []byte, save bool ) erro
     if s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
     }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
     return nil
 }
 
@@ -427,6 +450,9 @@ func (s *storage) insertClipboardAt( pos, tag int64, bg byteGetter ) error {
     if s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
     }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
     return nil
 }
 
@@ -461,6 +487,9 @@ func (s *storage) cutInCurData( pos, tag, length int64, save bool ) error {
     }
     if s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
+    }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
     }
     return nil
 }
@@ -549,6 +578,9 @@ func (s *storage) replaceInCurData( pos, tag, dl int64, data []byte, save bool )
     if curLen != int64(len(s.curData)) && s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
     }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
     return nil
 }
 
@@ -599,6 +631,9 @@ func (s *storage) replaceWithClipboardAt( pos, tag, dl int64, bg byteGetter ) er
     if curLen != int64(len(s.curData)) && s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
     }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
     return nil
 }
 
@@ -637,5 +672,8 @@ func (s *storage) replaceByteAtAndEraseFollowingBytes( pos, tag int64, v byte,
         s.newData = append( s.newData, 0 )
     }
     copy( s.curData[pos:pos+il], s.newData[nPos:nPos+il] )
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
     return nil
 }

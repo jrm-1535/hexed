@@ -51,7 +51,7 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
             false, -1, -1, -1, -1 },
         { "close", accelCode{ 'w', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             false, menuFileClose, menuFileCloseHelp, -1, -1 },
-        { "quit", accelCode{ 'q', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+        { "exit", accelCode{ 'q', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             true, menuFileQuit, menuFileQuitHelp, -1, -1 },
     }
     nItems += len(fileMenuDef)
@@ -77,8 +77,10 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
             false, menuEditDelete, menuEditDeleteHelp, -1, -1 },
         { "", accelCode{ 0, 0, 0 },
             false, -1, -1, -1, -1 },
-        { "select", accelCode{ 'a', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+        { "selectAll", accelCode{ 'a', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             false, menuEditSelect, menuEditSelectHelp, -1, -1 },
+        { "Explore", accelCode{ 'e', gdk.MOD1_MASK, gtk.ACCEL_VISIBLE },
+            false, menuEditExplore, menuEditExploreHelp, -1, -1 },
         { "", accelCode{ 0, 0, 0 },
             false, -1, -1, -1, -1 },
         { "preferences", accelCode{ 0, 0, 0 },
@@ -97,7 +99,7 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
     nItems += len(searchMenuDef)
 
     var helpMenuDef = []menuItemDef {
-        { "help", accelCode{ 0, 0, 0 },
+        { "content", accelCode{ 0, 0, 0 },
             true, menuHelpContent, menuHelpContentHelp, -1, -1 },
         { "about", accelCode{ 0, 0, 0 },
             true, menuHelpAbout, menuHelpAboutHelp, -1, -1 },
@@ -175,7 +177,7 @@ func refreshMenus( ) {
 // enable or disable individual menu item. The argument aName  uniquely
 // identifies the menu item across all menus. 
 func enableMenuItem( aName string, enable bool ) {
-fmt.Printf("Enabling menu item for %s action: %v\n", aName, enable )
+//    fmt.Printf("Enabling menu item for %s action: %v\n", aName, enable )
     mi := locateMenuItemByActionName( aName )
     mi.gtkItem.SetSensitive( enable )
 }
@@ -225,6 +227,39 @@ func appendMenuItem( m *menu, mi *gtk.MenuItem, it *menuItemDef ) *menuItem {
     return mItem
 }
 
+func addMenuItem( m *menu, itemDef *menuItemDef,
+                 shortCuts *gtk.AccelGroup ) *gtk.MenuItem {
+
+    gmi, err := gtk.MenuItemNewWithLabel( localizeText( itemDef.labelId ) )
+    if err != nil {
+        log.Fatalf( "Unable to create a GTK MenuItem: %v\n", err )
+    }
+
+    menuItem := appendMenuItem( m, gmi, itemDef )
+
+    gmi.SetSensitive( itemDef.enable )
+    if itemDef.accel.key != 0 {
+        gmi.AddAccelerator( "activate", shortCuts, itemDef.accel.key,
+                            itemDef.accel.mod, itemDef.accel.flag )
+    }
+    gmi.Connect( "enter-notify-event",
+                func ( gmi *gtk.MenuItem ) {
+                    showMenuHint( localizeText( menuItem.getHintId() ) )
+                }  )
+    gmi.Connect( "leave-notify-event", removeMenuHint )
+
+    actionName := itemDef.aName
+    menuAction := func( ) {
+        clearMenuHint()
+        fmt.Printf("action %s called\n", actionName)
+        act( actionName )
+    }
+    gmi.Connect( "activate", menuAction )
+    menuItems[ actionName ] = menuItem
+
+    return gmi
+}
+
 func initMenuBar( menuDefs *[]menuDef ) *gtk.MenuBar {
 
     shortCuts, err := gtk.AccelGroupNew()
@@ -236,10 +271,6 @@ func initMenuBar( menuDefs *[]menuDef ) *gtk.MenuBar {
     menuBar, err := gtk.MenuBarNew()
     if err != nil {
         log.Fatalf( "Unable to create a GTK MenuBar: %v\n", err )
-    }
-
-    clearHint := func ( mi *gtk.MenuItem ) {
-        removeMenuHint( )
     }
 
     var m *menu
@@ -257,37 +288,9 @@ func initMenuBar( menuDefs *[]menuDef ) *gtk.MenuBar {
         m = addMenu( m, gmni, menuDef.nameId )
         for _, itemDef := range( *menuDef.items ) {
 
-            actionName := itemDef.aName
-            if actionName != "" {                // a real item
-
-                
-                gmi, err := gtk.MenuItemNewWithMnemonic( localizeText(itemDef.labelId) )
-                if err != nil {
-                    log.Fatalf( "Unable to create a GTK MenuItemWithMnemonic: %v\n", err )
-                }
-                menuItem := appendMenuItem( m, gmi, &itemDef )
-
-                gmi.SetUseUnderline( true )
-                gmi.SetSensitive( itemDef.enable )
-                if itemDef.accel.key != 0 {
-                    gmi.AddAccelerator( "activate", shortCuts, itemDef.accel.key,
-                                        itemDef.accel.mod, itemDef.accel.flag )
-                }
-                gmi.Connect( "enter-notify-event",
-                            func ( gmi *gtk.MenuItem ) {
-                                showMenuHint( localizeText( menuItem.getHintId() ) )
-                            }  )
-                gmi.Connect( "leave-notify-event", clearHint )
-                menuAction := func( ) {
-                    clearMenuHint()
-                    fmt.Printf("action %s called\n", actionName)
-                    act( actionName )
-                }
-                gmi.Connect( "activate", menuAction )
-
+            if itemDef.aName != "" {                // a real item
+                gmi := addMenuItem( m, &itemDef, shortCuts )
                 gmn.Add( gmi )
-                menuItems[ actionName ] = menuItem
-
             } else {                                // a separation line
 
                 gms, err := gtk.SeparatorMenuItemNew( )
