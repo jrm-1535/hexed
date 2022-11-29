@@ -48,14 +48,11 @@ func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
     }
 
     l := len(clipBoard.data)    // in bytes
-//    fmt.Printf("Ascii: %s len=%d\n", ascii, l )
-// read binary data from hex chars, prefixed with "0x"
-    if l < 4 || (l & 1) != 0 || clipBoard.data[0] != '0' ||
-                (clipBoard.data[1] != 'x' && clipBoard.data[1] != 'X') {
-fmt.Printf("isClipboardAvalaible returns false\n")
+    if l < 2 || (l & 1) != 0 {
+        fmt.Printf("isClipboardAvailable returns false\n")
         return false, nil
     }
-    clipBoard.index = 2         // in nibbles after removing leading 0x
+    clipBoard.index = 0
     clipBoard.extraValid = false
     return true, &clipBoard
 }
@@ -66,12 +63,14 @@ fmt.Printf("isClipboardAvalaible returns false\n")
 func (hcp *hexClipboard) setExtraNibbles( extra byte ) {
     hcp.extraByte = extra
     hcp.extraValid = true
+//fmt.Printf("clipboard setExtraNibbles: first nibble=%#2x, last nibble=%#2x\n",
+//           extra >> 4, extra & 0x0f)
 }
 
 func (hcp *hexClipboard)size() ( n int64 ) {
-    n = int64(len(hcp.data)) / 2    // in bytes, including extra 2 nibbles
-    if ! hcp.extraValid {           // unless extraByte is not valid
-        n --
+    n = int64(len(hcp.data)) / 2    // in bytes
+    if hcp.extraValid { // including extra 2 nibbles if extraByte is valid
+        n ++
     }
     return
 }
@@ -91,20 +90,20 @@ func getNibbleFromHexDigit( hc byte ) (nibble byte) {
 // as content target, return directly 1 binary byte
 func (hcp *hexClipboard)get() byte {
     l := hcp.size()
-//fmt.Printf( "clipboard size=%d index=%d extra=%#02x valid=%v\n",
-//            l, hcp.index, hcp.extraByte, hcp.extraValid )
-    if hcp.index - 2 >= 2 * l {
+//fmt.Printf( "clipboard size=%d index=%d extra=%#02x valid=%v data=%v\n",
+//            l, hcp.index, hcp.extraByte, hcp.extraValid, hcp.data )
+    if hcp.index >= 2 * l {
         panic("out of clipboard data\n")
     }
     var b byte
-    if hcp.extraValid && hcp.index == 2 {
+    if hcp.extraValid && hcp.index == 0 {
         b = hcp.extraByte >> 4
     } else {
         b = getNibbleFromHexDigit( hcp.data[hcp.index] )
         hcp.index++
     }
     b <<= 4
-    if hcp.extraValid && hcp.index == (2 * l) {
+    if hcp.extraValid && hcp.index == 2 * (l-1) {
         b += hcp.extraByte & 0x0f
     } else {
         b += getNibbleFromHexDigit( hcp.data[hcp.index] )
@@ -141,10 +140,8 @@ func setClipboardData( data []byte ) {
 // TODO: when available in gotk3, use setWithOwner instead of immediate copy here
     l := len( data )
 //fmt.Printf("setClipboardData: data len=%d\n", l)
-    b := make( []byte, (l+1) * 2 )  // 0x + 2 char per data byte
-    b[0] = '0'
-    b[1] = 'x'
-    writeHexDigitsFromSlice( b[2:], data )
+    b := make( []byte, l * 2 )  // 2 char per data byte
+    writeHexDigitsFromSlice( b, data )
     clipBoard.cb.SetText( string(b) )
     pasteDataExists( true )
 }

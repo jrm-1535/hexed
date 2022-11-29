@@ -11,38 +11,30 @@ const (
     defSliceSize = 32       // must be 2 power
 )
 
-type command int
-const (
-    DELETE  = iota + 1
-    INSERT
-    REPLACE
-)
-
-func getCommandString( c command ) string {
-    var cs string
-    switch c {
-    case DELETE:    cs = "DELETE"
-    case INSERT:    cs = "INSERT"
-    case REPLACE:   cs = "REPLACE"
-    default:        cs = "Not a Command"
-    }
-    return cs
-}
-    
-type operation struct {
-    cmd                 command
-    position,                           // where in data cmd takes place
+type singlePosOp struct {
     tag,                                // caller's command tag (returned at undo/redo)
     delLen,                             // length of replaced or deleted data
-    insLen              int64           // length of replacing or inserted data
+    insLen,                             // length of replacing or inserted data
+    backup, cut,                        // where data is saved for undo
+    position            int64           // where in data operation takes place
+}
+
+type multiPosOp struct {
+    tag,                                // caller's command tag (returned at undo/redo)
+    delLen,                             // length of replaced or deleted data
+    insLen,                             // length of replacing or inserted data
     backup, cut         int64           // where data is saved for undo
+    positions           []int64         // where in data operations take place
 }
 
 type storage struct {
     curData             []byte          // always current data
     newData             []byte          // inserted/replacing data (for redo)
     cutData             []byte          // deleted/replaced data (for redo)
-    stack               []operation     // UNDO-REDO stack
+
+//    stack               []operation     // UNDO-REDO stack
+    stack               []interface{}   // UNDO-REDO stack
+
     top                 int             // stack pointer
     notifyDataChange    func( )
     notifyLenChange     func( l int64 )
@@ -58,7 +50,6 @@ func (s *storage) print(  ) {
 func (s *storage) printInternal( ) {
     fmt.Printf( "newData storage %v\n", s.newData )
     fmt.Printf( "cutData storage %v\n", s.cutData )
-//    fmt.Printf( "pasteData storage %v\n", s.pasteData )
 }
 
 func (s *storage) printStack( ) {
@@ -67,8 +58,17 @@ func (s *storage) printStack( ) {
         if i == s.top {
             fmt.Printf( "  ------------------------------------\n" )
         }
-        fmt.Printf( "  @%d cmd %v, pos %d, delLen %d, insLen %d, back %d, cut %d\n",
-                    i, op.cmd, op.position, op.delLen, op.insLen, op.backup, op.cut )
+
+        switch op := op.(type) {
+        case singlePosOp:
+            fmt.Printf( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
+                        i, op.tag, op.delLen, op.insLen, op.backup, op.cut,
+                        1, op.position )
+        case multiPosOp:
+            fmt.Printf( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
+                        i, op.tag, op.delLen, op.insLen, op.backup, op.cut,
+                        len(op.positions), op.positions[0] )
+        }
     }
 }
 
@@ -115,7 +115,7 @@ func initStorage( path string ) ( *storage, error ) {
     }
 
     var result storage
-    result.stack = make( []operation, 0, defUndoSize )
+    result.stack = make( []interface{}, 0, defUndoSize )
     result.curData = initialData
     return &result, nil
 }
@@ -130,7 +130,7 @@ func (s *storage)reload( path string ) error {
     s.curData = nil
     s.newData = nil
     s.cutData = nil
-    s.stack = make( []operation, 0, defUndoSize )
+    s.stack = make( []interface{}, 0, defUndoSize )
     s.top = 0
     if s.curData, err = os.ReadFile( path ); err == nil {
         if s.notifyDataChange != nil {
@@ -179,29 +179,22 @@ func (s *storage) undo( ) (pos, tag int64, err error) {
     }
 
     op := s.stack[s.top]
-
-    cmd := op.cmd
-    pos = op.position
-    tag = op.tag
-    dl := op.delLen
-    il := op.insLen
-
-    switch cmd {
-    default:
-        panic("operation not implemented\n" )
-    case DELETE:
+    switch op := op.(type) {
+    case singlePosOp:
+        tag = op.tag
+        pos = op.position
         c := op.cut
-        fmt.Printf( "UNDO DELETE @position %d, length %d\n", pos, dl )
-        err = s.insertInCurData( pos, tag, s.cutData[c:c+dl], false )
-
-    case INSERT:
-        fmt.Printf( "UNDO INSERT @position %d, length %d\n", pos, il )
-        err = s.cutInCurData( pos, tag, il, false )
-
-    case REPLACE:
-        fmt.Printf( "UNDO REPLACE @position %d, length (del %d, ins %d)\n", pos, dl, il )
+        s.replaceInCurDataNotify( pos, tag, op.insLen,
+                                  s.cutData[c:c+op.delLen] )
+    case multiPosOp:
+        tag = op.tag
+        pos = op.positions[0]
         c := op.cut
-        err = s.replaceInCurData( pos, tag, il, s.cutData[c:c+dl], false )
+fmt.Printf( "undo multiPosOp: tag=%d insLen=%d delLen=%d nPos=%d pos=%v\n",
+            tag, op.insLen, op.delLen, len(op.positions), op.positions )
+fmt.Printf("       backup=%d %v cut=%d %v\n", op.backup, s.newData, op.cut, s.cutData )
+        s.replaceInCurDataAtMultipleLocations( op.positions, tag, op.insLen,
+                                               s.cutData[c:c+op.delLen], false )
     }
     return
 }
@@ -225,31 +218,21 @@ func (s *storage) redo( ) (pos, tag int64, err error) {
         s.notifyUndoRedo( true, s.top < len( s.stack) )
     }
 
-    cmd := op.cmd
-    pos = op.position
-    tag = op.tag
-    dl := op.delLen
-    il := op.insLen
-
-    switch cmd {
-    default:
-        panic("operation not implemented\n" )
-    case DELETE:
-        fmt.Printf( "REDO DELETE @position %d, length %d\n", pos, dl )
-        err = s.cutInCurData( pos, tag, dl, false )
-
-    case INSERT:
+    switch op := op.(type) {
+    case singlePosOp:
+        tag = op.tag
+        pos = op.position
         b := op.backup
-        fmt.Printf( "REDO INSERT @position %d, length %d. backup %d\n", pos, il, b )
-        err = s.insertInCurData( pos, tag, s.newData[b:b+il], false )
-
-    case REPLACE:
+        s.replaceInCurDataNotify( op.position, op.tag, op.delLen,
+                                  s.newData[b:b+op.insLen] )
+    case multiPosOp:
+        tag = op.tag
+        pos = op.positions[0]
         b := op.backup
-        c := op.cut
-        fmt.Printf( "REDO REPLACE @position %d, length (del %d, ins %d), cut %d, backup %d\n",
-                    pos, dl, il, c, b )
-        err = s.replaceInCurData( pos, tag, dl, s.newData[b:b+il], false )
+        s.replaceInCurDataAtMultipleLocations( op.positions, op.tag, op.delLen,
+                                               s.newData[b:b+op.insLen], true )
     }
+
     return
 }
 
@@ -263,61 +246,66 @@ func (s *storage) areUndoRedoPossible( ) (u, r bool) {
     return
 }
 
-// push command {operation (DELETE, INSERT or REPLACE), position, current
-// and new length} onto the undo/redo stack. Usually this means just appending
-// a command to the stack, but if operations were previously undone, the top
-// of the stack is not at the end of the slice anymore. In that case, all
-// operations that could be redone until now are just removed from the slice
-// and the backup (newData) and cut (cutData) storage are cleaned: it is now
-// impossible to redo them, and previously saved data must be forgotten.
-
-// because it might change newData and/or cutData length, push must be called
+// push operation position(s), caller tag, deleted and inserted lengths onto the
+// undo/redo stack. Usually this means just appending an operation to the stack,
+// but if operations were previously undone, the top of the stack is not at the
+// end of the slice anymore. In that case, all operations that could be redone
+// until now are just removed from the slice and the backup (newData) and cut
+// (cutData) storage are cleaned: afterwards, previously saved data for redo are
+// forgotten and it is impossible to redo those operations.
+// Because it might change newData and/or cutData length, pushOp must be called
 // before updating newData or cutData (see insertInCurData and cutInCurData).
-func (s *storage) push( c command, p, t, cl, nl int64 ) {
-    if s.top >= len( s.stack ) {
-        s.stack = append( s.stack, operation{ c, p, t, cl, nl,
-                                              int64(len(s.newData)),
-                                              int64(len(s.cutData)) } )
-        s.top ++
-    } else { // previous commands go out of scope, clean up newData or cutData
+func (s *storage) pushSinglePosOp( p, t, dl, il int64 ) {
+    s.cleanStack()
+    s.stack = append( s.stack, singlePosOp{ t, dl, il,
+                                            int64(len(s.newData)),
+                                            int64(len(s.cutData)), p } )
+    s.top ++
+    if s.top < len( s.stack ) {
+        panic( "pushSinglePosOp not at top of stack" )
+    }
+    s.notifyUndoRedo( true, false )
+}
+
+func (s *storage) pushMultiPosOp( p []int64, t, dl, il int64 ) {
+    s.cleanStack()
+    s.stack = append( s.stack, multiPosOp{ t, dl, il,
+                                            int64(len(s.newData)),
+                                            int64(len(s.cutData)), p } )
+    s.top ++
+    s.notifyUndoRedo( true, /*s.top < len( s.stack)*/ false )
+}
+
+func (s *storage) cleanStack( ) {
+    if s.top < len( s.stack ) {
         for i := len( s.stack)-1; i >= s.top; i-- {
             op := s.stack[i]
-            fmt.Printf( "UNDO/REDO command @%d cmd=%s, pos=%d, delLen=%d insLen=%d lost\n",
-                        s.top, getCommandString(op.cmd), op.position, op.delLen, op.insLen )
 
-            switch op.cmd {
-            case INSERT:
-                if int64(len(s.newData)) <= op.backup {
-                    panic( "push: newData inconsistent\n" );
-                }
-                s.newData = s.newData[:op.backup]
-            case REPLACE:
-                if int64(len(s.newData)) <= op.backup {
-                    panic( "push: newData inconsistent\n" );
-                }
-                if int64(len(s.cutData)) <= op.cut {
-                    panic( "push: cutData inconsistent\n" );
-                }
-                s.newData = s.newData[:op.backup]
-                s.cutData = s.cutData[:op.cut]
-            case DELETE:
-                if int64(len(s.cutData)) <= op.cut {
-                    panic( "push: cutData inconsistent\n" );
-                }
-                s.cutData = s.cutData[:op.cut]
-            default:
-                panic( "push: unkown command in stack\n" )
+            var b, c int64
+            switch op := op.(type) {
+            case singlePosOp:
+                b, c = op.backup, op.cut
+                fmt.Printf( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
+                            s.top, op.tag, op.delLen, op.insLen,
+                            1, op.position )
+            case multiPosOp:
+                b, c = op.backup, op.cut
+                fmt.Printf( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
+                            s.top, op.tag, op.delLen, op.insLen,
+                            len(op.positions), op.positions[0] )
             }
+            // REPLACE, or INSERT (no cut data) or DELETE (no new data)
+            if int64(len(s.newData)) < b {
+                panic( "push: newData inconsistent\n" );
+            }
+            if int64(len(s.cutData)) < c {
+                panic( "push: cutData inconsistent\n" );
+            }
+            s.newData = s.newData[:b]
+            s.cutData = s.cutData[:c]
         }
-        fmt.Printf( "newData storage %v\n", s.newData )
-        fmt.Printf( "cutData storage %v\n", s.cutData )
-        s.stack[s.top] = operation{ c, p, t, cl, nl,
-                                    int64(len(s.newData)),
-                                    int64(len(s.cutData)) }
-        s.top ++
         s.stack = s.stack[:s.top]
     }
-    s.notifyUndoRedo( true, s.top < len( s.stack) )
 }
 
 // insert data bytes at position pos in main storage.
@@ -330,7 +318,7 @@ func (s *storage) insertInCurData( pos, tag int64, data []byte, save bool ) erro
     }
     il := int64(len(data))
     if save {
-        s.push( INSERT, pos, tag, 0, il ) // no byte deleted, il inserted
+        s.pushSinglePosOp( pos, tag, 0, il )           // no byte deleted, il inserted
         s.newData = append( s.newData, data... )
     }
     if cl == pos {   // just append bytes
@@ -399,7 +387,7 @@ func (s *storage) insertClipboardAt( pos, tag int64, bg byteGetter ) error {
         return fmt.Errorf("INSERT outside data boundaries\n")
     }
     il := bg.size()
-    s.push( INSERT, pos, tag, 0, il ) // no byte deleted, il inserted
+    s.pushSinglePosOp( pos, tag, 0, il )           // no byte deleted, il inserted
     nPos := int64(len(s.newData))
     for i:= int64(0); i < il; i++ {
         s.newData = append( s.newData, bg.get( ) )
@@ -476,7 +464,7 @@ func (s *storage) cutInCurData( pos, tag, length int64, save bool ) error {
     }
 
     if save {
-        s.push( DELETE, pos, tag, length, 0 )    // length bytes removed, 0 inserted
+        s.pushSinglePosOp( pos, tag, length, 0 )   // length bytes removed, 0 inserted
         s.cutData = append( s.cutData, s.curData[pos:pos+length]... )
     }
     if pos == curLen-length {
@@ -530,20 +518,10 @@ func (s *storage) copyBytesAt( pos, n int64 ) error {
 }
 
 // replace existing data[pos:pos+dl] in the main buffer with new data.
-// if save is true, push REPLACE command onto the undo/redo stack,
-//                  save the existing data in the cut storage and
-//                  save the new data into the backup storage.
-func (s *storage) replaceInCurData( pos, tag, dl int64, data []byte, save bool ) error {
+func (s *storage) replaceInCurData( pos, tag, dl int64, data []byte ) {
     curLen := int64(len(s.curData))
-    if pos < 0 || dl < 0 || (pos + dl) > curLen {
-        return fmt.Errorf("REPLACE outside data boundaries\n")
-    }
     il := int64(len(data))
-    if save {
-        s.push( REPLACE, pos, tag, dl, il ) // dl removed, il inserted
-        s.cutData = append( s.cutData, s.curData[pos:pos+dl]... )
-        s.newData = append( s.newData, data... )
-    }
+
     if il <= dl {
         // replace first il bytes in [pos:pos+il]
         copy( s.curData[pos:], data )
@@ -551,100 +529,135 @@ func (s *storage) replaceInCurData( pos, tag, dl int64, data []byte, save bool )
         copy( s.curData[pos+il:], s.curData[pos+dl:] )
         // shrink the slice to pos+(il-dl)
         s.curData = s.curData[:curLen-dl+il]
+    } else if pos + il > curLen {
+        // ==----xxxx  curData
+        //   ^   ^   ^
+        //  pos +dl curLen
+        //   ++++++++>>>>>>>  data
+        //   ^             ^
+        //   0             il
+
+        // ==----xxxx>>>>>>>
+        s.curData = append( s.curData, data[curLen-pos:]... )
+
+        // ==----xxxx>>>>>>>xxxx
+        s.curData = append( s.curData, s.curData[pos+dl:curLen]... )
+
+        // ==++++++++>>>>>>>xxxx
+        copy( s.curData[pos:], data[:curLen-pos] )
     } else {
-        // ==--------=========::::  s.curData
+        // ==--------xxxx=====::::  s.curData
         //   ^       ^            ^
         //  pos     +dl        curLen
-        //   xxxxxxxx++++           data
+        //   ++++++++++++           data
         //   ^           ^
         //   0          il
-
-        // ==xxxxxxxx=========::::  s.curData
-        copy( s.curData[pos:pos+dl], data )
-
-        // ==xxxxxxxx=========::::  s.curData
-        // ==xxxxxxxx=========::::::::  s.curData
+        //                        v
+        // ==--------xxxx=====::::::::  s.curData
         s.curData = append( s.curData, s.curData[curLen-(il-dl):]... )
 
-        // ==xxxxxxxx=========::::::::  s.curData
-        // ==xxxxxxxx=============::::  s.curData
+        // ==--------xxxx=====::::::::  s.curData
+        // ==--------xxxxxxxx=====::::  s.curData
         copy( s.curData[pos+il:curLen], s.curData[pos+dl:] )
 
-        // ==xxxxxxxx=============::::  s.curData
-        //   xxxxxxxx++++
-        // ==xxxxxxxx++++=========::::
-        copy( s.curData[pos+dl:], data[dl:] )
+        // ==--------xxxxxxxx=====::::  s.curData
+        //   ++++++++++++
+        // ==++++++++++++xxxx=====::::
+        copy( s.curData[pos:], data )
     }
+}
+
+func (s *storage) replaceInCurDataNotify( pos, tag, dl int64, data []byte ) {
+
+    curLen := int64(len(s.curData))
+    s.replaceInCurData( pos, tag, dl, data )
     if curLen != int64(len(s.curData)) && s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
     }
     if s.notifyDataChange != nil {
         s.notifyDataChange()
     }
+}
+
+func (s *storage) replaceInCurDataNotifySave( pos, tag, dl int64,
+                                              data []byte ) error {
+    curLen := int64(len(s.curData))
+    if pos < 0 || dl < 0 || (pos + dl) > curLen {
+        return fmt.Errorf("REPLACE outside data boundaries\n")
+    }
+    il := int64(len(data))
+    s.pushSinglePosOp( pos, tag, dl, il )  // dl removed, il inserted
+
+    s.cutData = append( s.cutData, s.curData[pos:pos+dl]... )
+    s.newData = append( s.newData, data... )
+    s.replaceInCurDataNotify( pos, tag, dl, data )
     return nil
 }
 
-func (s *storage) replaceWithClipboardAt( pos, tag, dl int64, bg byteGetter ) error {
+func (s *storage) replaceWithClipboardAt( pos, tag, dl int64,
+                                          bg byteGetter ) error {
     curLen := int64(len(s.curData))
     if pos < 0 || dl < 0 || (pos + dl) > curLen {
         return fmt.Errorf("REPLACE outside data boundaries\n")
     }
     il := bg.size()
-    s.push( REPLACE, pos, tag, dl, il ) // dl removed, il inserted
+    s.pushSinglePosOp( pos, tag, dl, il )      // dl removed, il inserted
+
     s.cutData = append( s.cutData, s.curData[pos:pos+dl]... )
     nPos := int64(len(s.newData))
     for i := int64(0); i < il; i++ {
         s.newData = append( s.newData, bg.get( ) )
     }
-
-    if il <= dl {
-        // replace first il bytes in [pos:pos+il]
-        copy( s.curData[pos:], s.newData[nPos:] )
-        // move remaining bytes beyond pos+dl to pos+il        
-        copy( s.curData[pos+il:], s.curData[pos+dl:] )
-        // shrink the slice to pos+(il-dl)
-        s.curData = s.curData[:curLen-dl+il]
-    } else {
-        // ==--------=========::::  s.curData
-        //   ^       ^            ^
-        //  pos     +dl        curLen
-        //   xxxxxxxx++++           s.newData
-        //   ^           ^
-        //  nPos        +il
-
-        // ==xxxxxxxx=========::::  s.curData
-        copy( s.curData[pos:pos+dl], s.newData[nPos:] )
-
-        // ==xxxxxxxx=========::::  s.curData
-        // ==xxxxxxxx=========::::::::  s.curData
-        s.curData = append( s.curData, s.curData[curLen-(il-dl):]... )
-
-        // ==xxxxxxxx=========::::::::  s.curData
-        // ==xxxxxxxx=============::::  s.curData
-        copy( s.curData[pos+il:curLen], s.curData[pos+dl:] )
-
-        // ==xxxxxxxx=============::::  s.curData
-        //   xxxxxxxx++++
-        // ==xxxxxxxx++++=========::::
-        copy( s.curData[pos+dl:], s.newData[nPos+dl:] )
-    }
-    if curLen != int64(len(s.curData)) && s.notifyLenChange != nil {
-        s.notifyLenChange( s.length())
-    }
-    if s.notifyDataChange != nil {
-        s.notifyDataChange()
-    }
+    s.replaceInCurDataNotify( pos, tag, dl, s.newData[nPos:] )
     return nil
 }
 
 // replace one byte at position pos
 func (s *storage) replaceByteAt( pos, tag int64, v byte ) error {
-    return s.replaceInCurData( pos, tag, 1, []byte{v}, true )
+    return s.replaceInCurDataNotifySave( pos, tag, 1, []byte{v} )
 }
 
 // replace multiple bytes at position pos
 func (s *storage) replaceBytesAt( pos, tag, l int64, v []byte ) error {
-    return s.replaceInCurData( pos, tag, l, v, true )
+    return s.replaceInCurDataNotifySave( pos, tag, l, v )
+}
+
+func (s *storage) replaceInCurDataAtMultipleLocations( pos []int64,
+                                                       tag, l int64,
+                                                       v []byte,
+                                                       correct bool ) {
+    nl := int64(len(v))
+    nPos := len(pos)
+    for i := 0; i < nPos; i++ {
+        var p int64
+        if correct {            // correct for length difference
+            p = pos[i] + int64(i) * (nl - l)
+        } else {
+            p = pos[i]
+        }
+        s.replaceInCurData( p, 0, l, v )
+    }
+    if s.notifyDataChange != nil {
+        s.notifyDataChange()
+    }
+}
+
+// replace multiple bytes at multiple locations given by the pos slice.
+func (s *storage) replaceBytesAtMultipleLocations( pos []int64, tag, l int64,
+                                                   v []byte ) error {
+    curLen := int64(len(s.curData))
+    for _, p := range pos {
+        if p < 0 || l < 0 || p + l > curLen {
+            return fmt.Errorf("REPLACE outside data boundaries\n")
+        }
+    }
+    nl := int64(len(v))
+    s.pushMultiPosOp( pos, tag, l, nl )
+    p := pos[0]
+    s.cutData = append( s.cutData, s.curData[p:p+l]... )
+    s.newData = append( s.newData, v... )
+    s.replaceInCurDataAtMultipleLocations( pos, tag, l, v, true )
+    return nil
 }
 
 // special operations to avoid creating extra slices when deleting bytes
@@ -663,7 +676,8 @@ func (s *storage) replaceByteAtAndEraseFollowingBytes( pos, tag int64, v byte,
     }
     il := int64(n+1)
 
-    s.push( REPLACE, pos, tag, il, il ) // il removed, il inserted
+//    s.push( REPLACE, pos, tag, il, il ) // il removed, il inserted
+    s.pushSinglePosOp( pos, tag, il, il )          // il removed, il inserted
     s.cutData = append( s.cutData, s.curData[pos:pos+il]... )
     nPos := int64(len(s.newData))
     s.newData = append( s.newData, v )

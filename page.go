@@ -251,6 +251,7 @@ func pasteClipboard( ) {
             if err != nil {
                 panic("Invalid selection\n")
             }
+            pc.resetSelection()
         } else {        // no current selection, just insert at caret
             bytePos := pc.caretPos >> 1
 fmt.Printf("pasteClipboard: insert at caret pos=%d\n", bytePos )
@@ -313,21 +314,25 @@ func selectAll( ) {
     pc.canvas.QueueDraw( )    // force redraw
 }
 
-func showHighlights( matchIndex int ) (moved bool) {
+func showHighlights( matchIndex, number int, bytePos int64 ) {
     pc := getCurrentPageContext()
-    pc.search = len(matches) > 0
-fmt.Printf( "showHighlights: len(matches)=%d, matchIndex=%d\n",
-            len(matches), matchIndex )
-    if matchIndex >= 0 && matchIndex < len(matches) {
-        showApplicationStatus( fmt.Sprintf( "match %d of %d",
-                               matchIndex + 1, len(matches) ) )
-        pc.caretPos = matches[matchIndex] << 1
+    pc.search = number > 0
+fmt.Printf( "showHighlights: number=%d, matchIndex=%d\n", number, matchIndex )
+    if matchIndex != -1 {
+        showApplicationStatus( fmt.Sprintf(  localizeText( match ),
+                               matchIndex + 1, number ) )
+        pc.caretPos = bytePos << 1
         pc.scrollPositionUpdate( pc.caretPos )
         pc.showBytePosition()
-        moved = true
+    } else {
+        if number > 0 {
+            showApplicationStatus( fmt.Sprintf( localizeText( nMatches ),
+                                                number ) )
+        } else {
+            showApplicationStatus( localizeText( noMatch ) )
+        }
     }
     pc.canvas.QueueDraw( )    // force redraw
-    return
 }
 
 func removeHighlights() {
@@ -451,9 +456,10 @@ func (pc *pageContext) addBoundingRectangles(
 }
 
 func ( pc *pageContext )getHighlightBoundingRectangles( ) (hr, ar []rectangle) {
-    for i := 0; i < len(matches); i++ {
-        hr, ar = pc.addBoundingRectangles( hr, ar, matches[i] == searchPos,
-                                          matches[i], matches[i] + matchSize )
+    size, pos, array := getSearchMatches()
+    for i := 0; i < len(array); i++ {
+        hr, ar = pc.addBoundingRectangles( hr, ar, array[i] == pos,
+                                          array[i], array[i] + size )
     }
     return
 }
@@ -555,7 +561,6 @@ func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) {
         return  // TODO: show popup action menu
     }
 
-    releaseSearchFocus( )
     pc := getCurrentPageContext()
     pc.setPageContentFocus()
 
@@ -786,6 +791,7 @@ func (pc *pageContext) scrollPositionFollowCaret( pos int64 ) {
 func gotoPos( pos int64 ) {
     pc := getCurrentPageContext()
     pc.setCaretPosition( pos, ABSOLUTE )
+    pc.setPageContentFocus()
     pc.canvas.QueueDraw( )    // force redraw
 }
 
@@ -921,7 +927,7 @@ func drawCaret( pc *pageContext, cr *cairo.Context ) {
         cr.LineTo( x, yStart + float64( pc.font.charHeight ) )
         cr.Stroke( )
     }
-    pc.setPageContentFocus( )
+//    pc.setPageContentFocus( )
 }
 
 /*
@@ -1272,9 +1278,20 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     return
 }
 
+func hasPageFocus( ) bool {
+    pc := getCurrentWorkAreaPageContext()
+    if pc != nil && pc.hideCaret == false {
+        return true
+    }
+    return false
+}
+
 func (pc *pageContext)setPageContentFocus( ) {
+    releaseSearchFocus( )
     pc.canvas.GrabFocus( )
     pc.hideCaret = false
+    clipboardAvail, _ := isClipboardDataAvailable()
+    pasteDataExists( clipboardAvail )
 }
 
 func transferFocus( maxLen int64 ) ( sel []byte ) {
@@ -1288,7 +1305,8 @@ func transferFocus( maxLen int64 ) ( sel []byte ) {
                 sel = pc.store.getData( s, s + l )
             }
         }
-        pc.canvas.QueueDraw( )          // force redraw
+        pasteDataExists( false )    // no paste allowed while search has focus
+        pc.canvas.QueueDraw( )      // force redraw
     }
     return
 }

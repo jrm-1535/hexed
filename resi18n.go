@@ -23,6 +23,10 @@ const (
     textReplaceMode
     textNoInputMode
 
+    match
+    noMatch
+    nMatches
+
     menuFile
     menuEdit
     menuSearch
@@ -88,6 +92,9 @@ const (
     menuSearchFind
     menuSearchFindHelp
 
+    menuSearchReplace
+    menuSearchReplaceHelp
+
     menuSearchGoto
     menuSearchGotoHelp
 
@@ -103,17 +110,18 @@ const (
     buttonCloseWithoutSave
 
     buttonGo
-    buttonFind
     buttonNext
     buttonPrevious
+    buttonReplace
+    buttonReplaceAll
 
     warningCloseFile
     gotoPrompt
     findPrompt
+    replacePrompt
 
     dialogCloseTitle
     dialogGotoTitle
-    dialogFindTitle
 
     arrayLength                      // must be last in this constant list
 )
@@ -141,7 +149,12 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "OVR",                                                  // textReplaceMode
     "===",                                                  // textNoInputMode
 
-    "_File",                                                // menuFile / prefix with '_' for menu shortcut
+    "Match %d of %d",                                       // match
+    "No matches found",                                     // noMatch
+    "%d matches",                                           // nMatches
+
+    // prefix with '_' for menu shortcut
+    "_File",                                                // menuFile
     "_Edit",                                                // menuEdit
     "_Search",                                              // menuSearch
     "_Help",                                                // menuHelp
@@ -206,9 +219,11 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Find",                                                 // menuSearchFind
     "Find a given hex string in file",                      // menuSearchFindHelp
 
+    "Replace",                                              // menuSearchReplace
+    "Replace the current match",                            // menuSearchReplaceHelp
+
     "Go to",                                                // menuSearchGoto
     "move to the given byte location",                      // menuSearchGotoHelp
-
 
     "Contents",                                             // menuHelpContent
     "show Hexed manual",                                    // menuHelpContentHelp
@@ -220,18 +235,21 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Cancel",                                               // buttonCancel
     "Save",                                                 // buttonSave
     "Close without saving",                                 // buttonCloseWithoutSave
+
     "Go",                                                   // buttonGo
-    "Find",                                                 // buttonFind
     "Next",                                                 // buttonNext
     "Previous",                                             // buttonPrevious
 
+    "Replace",                                              // buttonReplace
+    "Replace All",                                          // buttonReplaceAll
+
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
-    "Enter hex string to find",                             // findPrompt
+    "Enter hex string to find ",                             // findPrompt
+    " replacement Hex string ",                             // replacePrompt
 
     "Save before closing?",                                 // dialogCloseTitle
     "Go to byte",                                           // dialogGotoTitle
-    "Find",                                                 // dialogFindTitle
 }
 
 var frenchRes [arrayLength]string = [arrayLength]string {
@@ -239,12 +257,16 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "document sans nom",                                    // emptyFile
 
-    "lecture",                                              // textReadOnly
-    "ecriture",                                             // textReadWrite
+    "VUE",                                                  // textReadOnly
+    "MOD",                                                  // textReadWrite
 
-    "inserer",                                              // textInsertMode
-    "écraser",                                              // textReplaceMode
-    "=======",                                              // textNoInputMode
+    "INS",                                                  // textInsertMode
+    "ECR",                                                  // textReplaceMode
+    "===",                                                  // textNoInputMode
+
+    "Place %d sur %d",                                      // match
+    "Introuvable",                                          // noMatch
+    "%d places",                                            // nMatches
 
     "_Fichier",                                             // menuFile / prefix with '_' for menu shortcut
     "_Edit",                                                // menuEdit
@@ -309,7 +331,10 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "choisit le language",                                  // menuEditLanguageHelp
 
     "Trouver",                                              // menuSearchFind
-    "Trouve la sequence hexadecimale donnée dans le fichier", // menuSearchFindHelp
+    "Trouve la séquence hexadécimale dans le fichier",      // menuSearchFindHelp
+
+    "Remplacer",                                            // menuSearchReplace
+    "Remplace la séquence trouvée",                         // menuSearchReplaceHelp
 
     "Aller à",                                              // menuSearchGoto
     "Positionne le curseur a l'adresse donnée",             // menuSearchGotoHelp
@@ -324,18 +349,21 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Annuler",                                              // buttonCancel
     "Enregistrer",                                          // buttonSave
     "Fermer sans enregistrer",                              // buttonCloseWithoutSave
+
     "Aller",                                                // buttonGo
-    "chercher",                                             // buttonFind
     "Suivant",                                              // buttonNext
     "Précédent",                                            // buttonPrevious
 
+    "Remplace",                                             // buttonReplace
+    "Remplace tous",                                        // buttonReplaceAll
+
     "Si vous fermez sans enregister, toutes les modifications seront perdues",  // warningCloseFile
     "Entrez l'adresse de l'octet en hexadecimal",           // gotoPrompt
-    "Entrez la sequence de characters hexa à chercher",     // findPrompt
+    "Chercher les characteres hexa",                        // findPrompt
+    " Replacer avec la chaine hexa",                        // replacePrompt
 
     "Enregistrer avant de Fermer ?",                        // dialogCloseTitle
     "Aller à",                                              // dialogGotoTitle
-    "Chercher",                                             // dialogFindTitle
 }
 
 var textResources [languageNumber]*[arrayLength]string  = [languageNumber]*[arrayLength]string { 

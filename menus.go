@@ -93,6 +93,8 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
     var searchMenuDef = []menuItemDef {
         { "find", accelCode{ 'f', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             false, menuSearchFind, menuSearchFindHelp, -1, -1 },
+        { "replace", accelCode{ 'h', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+            false, menuSearchReplace, menuSearchReplaceHelp, -1, -1 },
         { "goto", accelCode{ 'j', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             false, menuSearchGoto, menuSearchGotoHelp, -1, -1 },
     }

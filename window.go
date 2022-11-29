@@ -7,7 +7,7 @@ import (
 //    "os"
     "path/filepath"
 	"github.com/gotk3/gotk3/gtk"
-//	"github.com/gotk3/gotk3/gdk"
+	"github.com/gotk3/gotk3/gdk"
 )
 
 /*
@@ -21,6 +21,7 @@ var (
 //    application     *gtk.Application        // application with
 //    window          *gtk.ApplicationWindow  // a single window made of
     window          *gtk.Window
+    shortcuts       *gtk.AccelGroup
     menus           *menu                   // a menu bar
 
     mainArea        *workArea               // a main work area
@@ -134,7 +135,18 @@ func temporarilySetReadOnly( readOnly bool ) {
 }
 
 func setWindowShortcuts( accelGroup *gtk.AccelGroup ) {
+    shortcuts = accelGroup
     window.AddAccelGroup( accelGroup )
+}
+
+func addToWindowShortcuts( button *gtk.Button, signal string, key uint,
+                           mods gdk.ModifierType ) {
+    button.AddAccelerator( signal, shortcuts, key, mods, gtk.ACCEL_VISIBLE )
+}
+
+func removeFromWindowShortcuts( button *gtk.Button, key uint,
+                                mods gdk.ModifierType ) {
+    button.RemoveAccelerator( shortcuts, key, mods )
 }
 
 func clearMenuHint( ) {
@@ -384,8 +396,8 @@ func InitApplication( args *hexedArgs ) {
     // create menus
     menuBar := buildMenus( )
 
-    // create search area
-    sarea := newSearchArea( )
+    // create Search/Replace area
+    srArea := newSearchReplaceArea( )
 
     mainArea, err = newWorkArea( )
     if err != nil {
@@ -404,7 +416,7 @@ func InitApplication( args *hexedArgs ) {
         log.Fatalf( "Unable to create a window box: %v\n", err )
     }
     windowBox.PackStart( menuBar, false, false, 0 )
-    windowBox.PackStart( sarea, false, false, 0 )
+    windowBox.PackStart( srArea, false, false, 0 )
     windowBox.PackStart( mainArea.getBin(), true, true, 1 )
 //    windowBox.PackEnd( p.sBar, false, false, 1 )
     windowBox.PackStart( statusArea, false, false, 0 )

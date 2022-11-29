@@ -92,7 +92,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     } else {
         pc.setOddCaretNoPending()
     }
-    pc.updateSearchPositionFromCaret()
+    updateSearchPosition( pc.caretPos >> 1 )
 }
 
 /*  Nibble state machine: 8 states and 3 events (insert, delete, backspace)
@@ -834,4 +834,3 @@ func getNibbleFromKey( keyVal uint ) (hex bool, nibble byte) {
     hex = true
     return
 }
-

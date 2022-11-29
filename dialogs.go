@@ -102,8 +102,13 @@ func hexFilter( entry *gtk.Entry, event *gdk.Event ) bool {
         return false
 
     default:
+        state := ev.State() & 0x0f
+//        fmt.Printf("Got key %#x state=%#x *CTL=%#x SHIFT=%#x ALT=%#x\n",
+//                    key, state, gdk.CONTROL_MASK, gdk.SHIFT_MASK, gdk.MOD1_MASK)
+        if state & gdk.CONTROL_MASK != 0 {
+            return false
+        }
         if hex, _ := getNibbleFromKey( key ); hex {
-//            fmt.Printf("Got key %#x\n", key)
             return false
         }
         return true
@@ -157,7 +162,7 @@ func gotoDialog( ) (op int, pos int64) {
     gd.Destroy()
     return
 }
-
+/*
 func findDialog( ) (op int, target string) {
     gd, err := gtk.DialogNewWithButtons( localizeText(dialogFindTitle), window,
                     gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
@@ -202,7 +207,7 @@ func findDialog( ) (op int, target string) {
     gd.Destroy()
     return
 }
-
+*/
 /*
 // generic dialog management
 

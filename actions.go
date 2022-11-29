@@ -66,7 +66,8 @@ func initActions( nItems int ) {
     }
     actions["language"] = languageAction
 
-    actions["find"] = search
+    actions["find"] = searchFind
+    actions["replace"] = searchReplace
 
     gotoAction := func( ) {
         fmt.Printf( "goto called\n" )
@@ -110,11 +111,13 @@ func dataExists( state bool ) {
     enableMenuItem( "selectAll", state )
     enableMenuItem( "saveAs", state )
     enableMenuItem( "find", state )
+    enableMenuItem( "replace", state )
     enableMenuItem( "goto", state )
 }
 
 func pasteDataExists( state bool ) {
-    enableMenuItem( "paste", state && isCurrentPageWritable() )
+    enableMenuItem( "paste", state &&
+                    hasPageFocus() && isCurrentPageWritable() )
 }
 
 func selectionDataExists( enableState bool, readOnly bool ) {
