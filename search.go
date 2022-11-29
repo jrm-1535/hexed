@@ -239,9 +239,6 @@ func hideSearchArea( ) {
 }
 
 func releaseSearchFocus( ) {
-/*
-    searchEntry.SelectRegion( 0, 0 )
-*/
     entry := getSearchEntry()
     entry.SelectRegion( 0, 0 )
 }
@@ -384,8 +381,12 @@ func replaceAllMatches( button *gtk.Button ) bool {
 
     pc := getCurrentPageContext()
     pc.store.replaceBytesAtMultipleLocations( matches, 0, matchSize, data )
+
+    appendSearchText()
     appendReplaceText()
-    highlightSearchResults( true )
+
+    entry = getSearchEntry()
+    incrementalSearch( entry )
     return true
 }
 
