@@ -1292,6 +1292,7 @@ func (pc *pageContext)setPageContentFocus( ) {
     pc.hideCaret = false
     clipboardAvail, _ := isClipboardDataAvailable()
     pasteDataExists( clipboardAvail )
+    selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
 }
 
 func transferFocus( maxLen int64 ) ( sel []byte ) {
@@ -1306,6 +1307,7 @@ func transferFocus( maxLen int64 ) ( sel []byte ) {
             }
         }
         pasteDataExists( false )    // no paste allowed while search has focus
+        selectionDataExists( false, true )  // no cut, copy or delete either
         pc.canvas.QueueDraw( )      // force redraw
     }
     return

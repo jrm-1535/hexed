@@ -16,11 +16,21 @@ type hexClipboard struct {
 
 var clipBoard hexClipboard
 
+func showClipboard() {
+    data, err := clipBoard.cb.WaitForText( )
+    if err == nil {
+        fmt.Printf( "Clipboard: %s\n", data )
+    } else {
+        fmt.Printf( "unable to get clipboard data\n" )
+    }
+}
+
 func ownerChanged( cb *gtk.Clipboard, event *gdk.Event ) {
     fmt.Printf( "Clipboard changed\n")
 //    if clipBoard != cb {
 //        fmt.Printf("Not the hexed clipBoard!\n")
 //    }
+    showClipboard()
 }
 
 func initClipboard( ) (err error) {  // which clipboard?

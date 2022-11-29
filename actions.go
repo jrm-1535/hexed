@@ -121,9 +121,9 @@ func pasteDataExists( state bool ) {
 }
 
 func selectionDataExists( enableState bool, readOnly bool ) {
-    enableMenuItem( "copy", enableState )
-    enableMenuItem( "cut", enableState && ! readOnly )
-    enableMenuItem( "delete", enableState && ! readOnly )
+    enableMenuItem( "copy", enableState && hasPageFocus() )
+    enableMenuItem( "cut", enableState && ! readOnly && hasPageFocus() )
+    enableMenuItem( "delete", enableState && ! readOnly &&hasPageFocus() )
 }
 
 func undoRedoUpdate( undo, redo bool ) {
