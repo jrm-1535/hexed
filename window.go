@@ -381,6 +381,11 @@ func InitApplication( args *hexedArgs ) {
         log.Fatal( "Unable to create window:", err )
     }
 */
+
+    initPreferences()
+    initFontContext()
+    initPagesContext()
+
     var err error
     window, err = gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
     if err != nil {
@@ -427,6 +432,8 @@ func InitApplication( args *hexedArgs ) {
     window.SetResizable( true )
     window.SetDefaultSize(width, height)
     showWindow()
+
+    initTheme()
 
     err = initClipboard( )
     if err != nil {

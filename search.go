@@ -15,6 +15,7 @@ const (
 )
 
 var (
+    areaVisible     bool                    // is search/replace area visible?
     searchArea      *gtk.Box                // search and replace area
 
     searchBox       *gtk.ComboBox           // search combo box
@@ -22,7 +23,7 @@ var (
 
     replaceOp       *gtk.Box                // replace operation box
     replaceBox      *gtk.ComboBox           // replace combo box
-    replaceList     *gtk.ListStore          // replace xombo box store
+    replaceList     *gtk.ListStore          // replace combo box store
 
     wrapMode        *gtk.ToggleButton       // search wrap
 
@@ -92,7 +93,7 @@ func newOperationBox( lId, b1Id, b2Id int,
 
     b2, err = gtk.ButtonNewWithLabel( localizeText( b2Id ) )
     if err != nil {
-        log.Fatal("newOperationBox: could not create fsecondirst button:", err)
+        log.Fatal("newOperationBox: could not create second button:", err)
     }
     b2.SetSizeRequest( 100, -1 )
 
@@ -207,6 +208,7 @@ func newSearchReplaceArea( ) *gtk.Box {
         log.Fatalf("newSearchReplaceArea: could not create wrapAround image: %v\n", err)
     }
     wrapMode.SetImage( wrapIcon )
+    wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
     wrapMode.SetTooltipText( "Wrap around" )
 
     exit, err := gtk.ButtonNewFromIconName( "window-close", gtk.ICON_SIZE_BUTTON )
@@ -224,18 +226,27 @@ func newSearchReplaceArea( ) *gtk.Box {
     searchArea.PackStart( wrapMode, false, false, 0 )
     searchArea.PackStart( exit, false, false, 0 )
 
+    registerForChanges( WRAP_MATCHES, updateWrapping )
 //fmt.Printf( "newSearchArea: created search area")
+    areaVisible = false
     return searchArea
 }
 
-func hideSearchArea( ) {
+func updateWrapping( name string ) {
+    if ! areaVisible {
+        wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
+    }
+}
 
+func hideSearchArea( ) {
     resetMatches(0)
     removeHighlights()
     searchArea.Hide( )
     if pc := getCurrentWorkAreaPageContext(); pc != nil {
         pc.setPageContentFocus()
     }
+    wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
+    areaVisible = false
 }
 
 func releaseSearchFocus( ) {
@@ -255,6 +266,7 @@ func setSearchFocus( ) *gtk.Entry {
         entry.SetPosition( -1 )
     }
     entry.GrabFocusWithoutSelecting()
+    areaVisible = true
     return entry
 }
 
@@ -300,6 +312,7 @@ func incrementalSearch( entry *gtk.Entry ) {
 }
 
 func highlightSearchResults( showReplace bool ) {
+
     searchArea.Show( )
     if showReplace {
         replaceOp.Show()

@@ -53,9 +53,13 @@ func initActions( nItems int ) {
     actions["delete"] = deleteSelection
     actions["selectAll"] = selectAll
 
+
+//    actions["explore"] =
+
     preferencesAction := func ( ) {
         fmt.Printf( "preferences called\n" )
-//        preferencesDialog()
+        showPreferencesDialog()
+
     }
     actions["preferences"] = preferencesAction
 

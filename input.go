@@ -33,7 +33,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     origin := int64(adj.GetValue())
     end := int64(adj.GetUpper())
     pageSize := int64(adj.GetPageSize())
-    pageNibbles := (pageSize / int64(pc.font.charHeight)) *
+    pageNibbles := (pageSize / int64(getCharHeight())) *
                                     int64(pc.nBytesLine << 1)
 
     if pc.sel.start != -1 {

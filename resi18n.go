@@ -104,6 +104,39 @@ const (
     menuHelpAbout
     menuHelpAboutHelp
 
+// preferences
+    windowTitlePreferences
+
+    dialogPreferencesEditorTab
+    dialogPreferencesSaveTab
+    dialogPreferencesThemeTab
+
+    dialogPreferencesFont
+    dialogPreferencesFontName
+    dialogPreferencesFontSize
+
+    dialogPreferencesDisplay
+    dialogPreferencesDisplayMinBytesLine
+    dialogPreferencesDisplayMaxBytesLine
+    dialogPreferencesDisplayLineIncrement
+
+    dialogPreferencesDisplayBytesSeparator
+    dialogPreferencesDisplayLinesSeparator
+
+    dialogPreferencesEditor
+    dialogPreferencesEditorReadOnly
+    dialogPreferencesEditorReplaceNode
+
+    dialogPreferencesSearch
+    dialogPreferencesSearchWrapAround
+    dialogPreferencesSearchShowAsciiReplace
+
+    dialogPreferencesSave
+    dialogPreferencesSaveBackup
+
+    dialogPreferencesTheme
+    dialogPreferencesThemeName
+
     buttonOk
     buttonCancel
     buttonSave
@@ -231,6 +264,38 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "About",                                                // menuHelpAbout
     "about Hexed",                                          // menuHelpAboutHelp
 
+    "Preferences",                                          // windowTitlePreferences
+
+    "Editor",                                               // dialogPreferencesEditorTab
+    "Save",                                                 // dialogPreferencesSaveTab
+    "Theme",                                                // dialogPreferencesThemeTab
+
+    "Font",                                                 // dialogPreferencesFont
+    "Family Name",                                          // dialogPreferencesFontName
+    "Size",                                                 // dialogPreferencesFontSize
+
+    "Display",                                              // dialogPreferencesDisplay
+    "Minimum number of bytes per line",                     // dialogPreferencesDisplayMinBytesLine
+    "Maximum number of bytes per line",                     // dialogPreferencesDisplayMaxBytesLine
+    "Number of bytes per increment",                        // dialogPreferencesDisplayLineIncrement
+
+    "Column separator each number of bytes",                // dialogPreferencesDisplayBytesSeparator
+    "Line separator each number of lines",                  // dialogPreferencesDisplayLinesSeparator
+
+    "Editor",                                               // dialogPreferencesEditor
+    "Start in Read Only mode",                              // dialogPreferencesEditorReadOnly
+    "Start in replace mode",                                // dialogPreferencesEditorReplaceNode
+
+    "Search",                                               // dialogPreferencesSearch
+    "Start in wraparound mode",                             // dialogPreferencesSearchWrapAround
+    "show replace bytes as ASCII too",                      // dialogPreferencesSearchShowAsciiReplace
+
+    "Updating",                                             // dialogPreferencesSave
+    "Create a backup file before saving",                   // dialogPreferencesSaveBackup
+
+    "Theme",                                                // dialogPreferencesTheme
+    "Select name",                                          // dialogPreferencesThemeName
+
     "Yes",                                                  // buttonOk
     "Cancel",                                               // buttonCancel
     "Save",                                                 // buttonSave
@@ -344,6 +409,38 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "À propos de",                                          // menuHelpAbout
     "à propos d'hexed",                                     // menuHelpAboutHelp
+
+    "Préférences",                                          // windowTitlePreference
+
+    "Editeur",                                              // dialogPreferencesEditorTab
+    "Enregistrer",                                          // dialogPreferencesSaveTab
+    "Thème",                                                // dialogPreferencesThemeTab
+
+    "Police",                                               // dialogPreferencesFont
+    "Famille",                                              // dialogPreferencesFontName
+    "Taille",                                               // dialogPreferencesFontSize
+
+    "Affichage",                                            // dialogPreferencesDisplay
+    "Nombre minimum d'octets par ligne",                    // dialogPreferencesDisplayMinBytesLine
+    "Nombre maximum d'octets par ligne",                    // dialogPreferencesDisplayMaxBytesLine
+    "Nombre d'octets par incrément",                        // dialogPreferencesDisplayLineIncrement
+
+    "Separateur de colonnes tous les",                      // dialogPreferencesDisplayBytesSeparator
+    "Separateur de lines toutes les",                       // dialogPreferencesDisplayLinesSeparator
+
+    "Editeur",                                              // dialogPreferencesEditor
+    "Démarrer en mode protéger",                            // dialogPreferencesEditorReadOnly
+    "Démarrer en mode remplacer",                           // dialogPreferencesEditorReplaceNode
+
+    "Chercher",                                             // dialogPreferencesSearch
+    "Démarrer en mode circulaire",                          // dialogPreferencesSearchWrapAround
+    "Présenter les octets de remplacement en texte",        // dialogPreferencesSearchShowAsciiReplace
+
+    "Mise à jour",                                          // dialogPreferencesSave
+    "Sauvegarder le ficher avant d'enregister",             // dialogPreferencesSaveBackup
+
+    "Thème",                                                // dialogPreferencesTheme
+    "Choisissez le thème",                                  // dialogPreferencesThemeName
 
     "Oui",                                                  // buttonOk
     "Annuler",                                              // buttonCancel

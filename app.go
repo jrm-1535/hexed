@@ -78,7 +78,7 @@ func main() {
     InitApplication( args )          // initialize main window and main loop
 }
 
-/* commented out ontil gtk3 supports applicationCommandLine
+/* commented out until gotk3 supports applicationCommandLine
     (e.g. g_application_command_line_get_arguments)
 
 func InitApplication( gApp *gtk.Application, args *hexedArgs ) {
