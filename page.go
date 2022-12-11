@@ -240,7 +240,7 @@ func (pc *pageContext) getAreasRectangle( ) (hex rectangle, asc rectangle) {
 
     adj := pc.barAdjust
     hex.h = adj.GetPageSize()
-    asc.h = adj.GetPageSize()
+    asc.h = hex.h
 
     cw := getCharWidth( )
     charWidth := int64(cw)
@@ -457,6 +457,7 @@ func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) {
     evButton := buttonEvent.Button()
 //    fmt.Printf("Event button=%d\n", evButton)
     if evButton != gdk.BUTTON_PRIMARY {
+fmt.Printf("Pressed mouse button %d\n", evButton )
         return  // TODO: show popup action menu
     }
 
@@ -681,6 +682,38 @@ func (pc *pageContext) scrollPositionUpdate( pos int64 ) {
             adj.SetValue( float64( top ) )
         }
     }
+}
+
+func mouseScroll( da *gtk.DrawingArea, event *gdk.Event ) bool {
+    eScroll := gdk.EventScrollNewFromEvent( event )
+    direction := eScroll.Direction()
+
+    pc := getCurrentPageContext()
+    adj := pc.barAdjust
+    origin := adj.GetValue()
+    pageSize := adj.GetPageSize()
+    upper := adj.GetUpper()
+    inc := float64( /*5 * */ getCharHeight( ))
+
+    switch direction {
+    case gdk.SCROLL_UP:
+//        fmt.Printf("scroll up\n")
+        if origin >= inc {
+            origin -= inc
+        } else {
+            origin = 0.0
+        }
+
+    case gdk.SCROLL_DOWN:
+//        fmt.Printf("scroll down\n")
+        if origin + pageSize < upper - inc {
+            origin += inc
+        } else {
+            origin = upper - pageSize
+        }
+    }
+    pc.barAdjust.SetValue( origin )
+    return true
 }
 
 func (pc *pageContext) scrollPositionFollowCaret( pos int64 ) {
@@ -1250,12 +1283,13 @@ func (pc *pageContext)activate( ) {
     da := pc.canvas
     da.SetEvents( int(gdk.EXPOSURE_MASK | gdk.BUTTON_PRESS_MASK |
                       gdk.BUTTON_RELEASE_MASK | gdk.KEY_RELEASE_MASK |
-                      gdk.POINTER_MOTION_MASK) )
+                      gdk.SCROLL_MASK | gdk.POINTER_MOTION_MASK) )
 
     da.ConnectAfter( "configure-event", updateScrollFromAreaSizeChange )
     da.Connect( "draw", drawDataLines )
     da.Connect( "button_press_event", moveCaret )
     da.Connect( "button_release_event", endSelection )
+    da.Connect( "scroll-event", mouseScroll )
     da.Connect( "motion-notify-event", updateSelection )
     da.Connect( "key_press_event", editAtCaret )
 

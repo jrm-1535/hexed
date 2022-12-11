@@ -7,6 +7,7 @@ import (
     "io"
     "strings"
     "bytes"
+    "math"
 	"strconv"
     "errors"
     "path/filepath"
@@ -246,23 +247,23 @@ type alternate struct {
 }
 
 var keyMapping = [...]alternate{
-    { "address",                choice{ ADDR_AREA_FOREGROUND, 1 },
-                                choice{ ADDR_AREA_BACKGROUND, 1 } },
-    { "hexadecimal",            choice{ HEXA_AREA_FOREGROUND, 1 },
-                                choice{ HEXA_AREA_FOREGROUND, 1 } },
-    { "ascii",                  choice{ ASCI_AREA_FOREGROUND, 1 },
-                                choice{ ASCI_AREA_FOREGROUND, 1 } },
+    { "address",                choice{ ADDR_AREA_FOREGROUND, 3 },
+                                choice{ ADDR_AREA_BACKGROUND, 3 } },
+    { "hexadecimal",            choice{ HEXA_AREA_FOREGROUND, 3 },
+                                choice{ HEXA_AREA_FOREGROUND, 3 } },
+    { "ascii",                  choice{ ASCI_AREA_FOREGROUND, 3 },
+                                choice{ ASCI_AREA_FOREGROUND, 3 } },
 
     { "current-match",          choice{ -1, -1 },
-                                choice{ CURRENT_MATCH_BACKGROUND, 1 } },
+                                choice{ CURRENT_MATCH_BACKGROUND, 3 } },
     { "search-match",           choice{ -1, -1 },
-                                choice{ OTHER_MATCHES_BACKGROUND, 1 } },
+                                choice{ OTHER_MATCHES_BACKGROUND, 3 } },
 
     { "selection",              choice{ -1, -1 },
-                                choice{ SELECTION_BACKGROUND, 1 } },
-    { "separator",              choice{ SEPARATOR_FOREGROUND, 1 },
+                                choice{ SELECTION_BACKGROUND, 3 } },
+    { "separator",              choice{ SEPARATOR_FOREGROUND, 3 },
                                 choice{ -1, -1 } },
-    { "cursor",                 choice{ CARET_FOREGROUND, 1 },
+    { "cursor",                 choice{ CARET_FOREGROUND, 3 },
                                 choice{ -1, -1 } },
 
     { "line-numbers",           choice{ ADDR_AREA_FOREGROUND, 2 },
@@ -270,31 +271,31 @@ var keyMapping = [...]alternate{
     { "text",                   choice{ HEXA_AREA_FOREGROUND, 2 },
                                 choice{ HEXA_AREA_BACKGROUND, 2 } },
     { "right-margin",           choice{ ASCI_AREA_FOREGROUND, 2 },
-                                choice{ ASCI_AREA_FOREGROUND, 2 } },
+                                choice{ ASCI_AREA_BACKGROUND, 2 } },
 
     { "bracket-match",          choice{ -1, -1 },
                                 choice{ OTHER_MATCHES_BACKGROUND, 2 } },
 
     { "current-line",           choice{ -1, -1 },
-                                choice{ SELECTION_BACKGROUND, 3 } },
+                                choice{ SELECTION_BACKGROUND, 1 } },
 
-    { "def:preprocessor",       choice{ ADDR_AREA_FOREGROUND, 3 },
+    { "def:preprocessor",       choice{ ADDR_AREA_FOREGROUND, 1 },
                                 choice{ -1, -1 } },
     { "current-line-number",    choice{ -1, -1 },
-                                choice{ ADDR_AREA_BACKGROUND, 3 } },
-    { "def:statement",          choice{ HEXA_AREA_FOREGROUND, 3 },
+                                choice{ ADDR_AREA_BACKGROUND, 1 } },
+    { "def:statement",          choice{ HEXA_AREA_FOREGROUND, 1 },
                                 choice{ -1, -1 } },
     { "background-pattern",     choice{ -1, -1 },
-                                choice{ HEXA_AREA_BACKGROUND, 3 } },
+                                choice{ HEXA_AREA_BACKGROUND, 1 } },
 
     { "bracket-mismatch",       choice{ -1, -1 },
-                                choice{ CURRENT_MATCH_BACKGROUND, 3 } },
+                                choice{ CURRENT_MATCH_BACKGROUND, 1 } },
 
     { "def:warning",            choice{ -1, -1 },
-                                choice{ SELECTION_BACKGROUND, 3 } },
+                                choice{ SELECTION_BACKGROUND, 1 } },
     { "draw-spaces",            choice{ -1, -1 },
-                                choice{ SEPARATOR_FOREGROUND, 3 } },
-    { "def-special-char",       choice{ CARET_FOREGROUND, 3 },
+                                choice{ SEPARATOR_FOREGROUND, 1 } },
+    { "def-special-char",       choice{ CARET_FOREGROUND, 1 },
                                 choice{ -1, -1 } },
 }
 
@@ -318,6 +319,13 @@ type theme struct {
     colorPatterns   [N_PATTERNS][4]byte  // [0] is priority, [1][2][3]=rgb
 }
 
+const (
+    colP = iota
+    colR
+    colG
+    colB
+)
+
 func (t *theme) setPattern( index int, priority int, col uint32 ) {
     if index < 0 || index >= N_PATTERNS {
         panic("Invalid pattern index\n")
@@ -325,11 +333,11 @@ func (t *theme) setPattern( index int, priority int, col uint32 ) {
 
 //fmt.Printf( " set uint32 col=%#08x, b=%#02x, g=%#x, r=%#02x @index %d, priority %d\n",
 //            col, byte( col ), byte( col >> 8 ), byte( col >> 16 ), index, priority )
-    if t.colorPatterns[index][0] < byte(priority) {
-        t.colorPatterns[index][3] = byte( col )
-        t.colorPatterns[index][2] = byte( col >> 8 )
-        t.colorPatterns[index][1] = byte( col >> 16 )
-        t.colorPatterns[index][0] = byte(priority)
+    if t.colorPatterns[index][colP] < byte(priority) {
+        t.colorPatterns[index][colB] = byte( col )
+        t.colorPatterns[index][colG] = byte( col >> 8 )
+        t.colorPatterns[index][colR] = byte( col >> 16 )
+        t.colorPatterns[index][colP] = byte(priority)
     }
 }
 
@@ -504,71 +512,126 @@ func setCaretColor( cr *cairo.Context ) {
     cr.SetSource( cairoPatterns[CARET_FOREGROUND] )
 }
 
-func setOppositeRGB( src, dst *[4]byte ) {
-    (*dst)[0] = 255 - (*src)[0]
-    (*dst)[1] = 255 - (*src)[1]
-    (*dst)[2] = 255 - (*src)[2]
+func setOppositeRGB( dst, src *[4]byte ) {
+    (*dst)[colR] = 255 - (*src)[colR]
+    (*dst)[colG] = 255 - (*src)[colG]
+    (*dst)[colB] = 255 - (*src)[colB]
 }
 
-// check if foreground values are sufficiently different from background ones
-// (calculating colors distance) and tries fixing them if needed:
-// - for address, force foreground to be opposite of address background
-// - for hex chars, if too close, use address foreground
-// - for ascii chars, if too close, use hex foreground
-// - for separator, if too close, use hex foreground
-// - for cursor, if missing or too close to hex background, force to opposite
-//   of hex background
-// - for selection, force greener hex background
-// - for matching, force bluer hex background
-func areColorsDistantEnough( col1, col2 *[4]byte ) bool {
-    // quick distance approximation
-    r1 := uint((*col1)[1])
-    g1 := uint((*col1)[2])
-    b1 := uint((*col1)[3])
+func getRelativeLUminance( col *[4]byte ) float64 {
 
-    r2 := uint((*col2)[1])
-    g2 := uint((*col2)[2])
-    b2 := uint((*col2)[3])
-fmt.Printf("r1=%d g1=%d b1=%d, r2=%d g2=%d b2=%d\n", r1, g1, b1, r2, g2, b2 )
-    var ds uint
-    if (r1 + r2) / 2 < 128 {
-        ds = (2 * (r1 - r2) * (r1 - r2)) + (4 * (g1 - g2) * (g1 - g2)) +
-             (3 * (b1 - b2) * (b1 - b2))
+    RsRGB := float64((*col)[colR]) / 255.0
+    GsRGB := float64((*col)[colG]) / 255.0
+    BsRGB := float64((*col)[colB]) / 255.0
+
+    var r, g, b float64
+    if RsRGB <= 0.03928 {
+        r = RsRGB / 12.92
     } else {
-        ds = (3 * (r1 - r2) * (r1 - r2)) + (4 * (g1 - g2) * (g1 - g2)) +
-             (2 * (b1 - b2) * (b1 - b2))
+        r = math.Pow( ((RsRGB+0.055)/1.055), 2.4 )
     }
-fmt.Printf("Distance square = %d\n", ds )
-    return ds > 25000 
+
+    if GsRGB <= 0.03928 {
+        g = GsRGB/12.92
+    } else {
+        g = math.Pow( ((GsRGB+0.055)/1.055), 2.4 )
+    }
+
+    if BsRGB <= 0.03928 {
+        b = BsRGB/12.92
+    } else {
+        b = math.Pow( ((BsRGB+0.055)/1.055), 2.4 )
+    }
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-func (t *theme) fixColorPatterns( ) {
-    if ! areColorsDistantEnough( &t.colorPatterns[ADDR_AREA_FOREGROUND],
-                                 &t.colorPatterns[ADDR_AREA_BACKGROUND] ) {
-        setOppositeRGB( &t.colorPatterns[ADDR_AREA_BACKGROUND],
-                        &t.colorPatterns[ADDR_AREA_FOREGROUND] )
+func isContrastSufficient( col1, col2 *[4]byte ) bool {
+    l1 := getRelativeLUminance( col1 )
+    l2 := getRelativeLUminance( col2 )
+
+    contrast := (l1 + 0.05) / (l2 + 0.05)
+    if contrast < 1.0 {
+        contrast = 1.0 / contrast
     }
-    if ! areColorsDistantEnough( &t.colorPatterns[HEXA_AREA_FOREGROUND],
+fmt.Printf("Contrast = %f\n", contrast )
+    return contrast >= 2.0
+}
+
+// Fix color pattern if a pattern was not set (missing in one theme file) or if
+// contrast between background and foregrpund color is not sufficient.
+// - for ADDR, force foreground to be opposite of ADDR background
+// - for HEXA chars, if background was never specified (priority == 0), use
+//                   instead ADDR background
+//                   then, if contrast between foreground and background colors
+//                         is insufficient, use ADDR foreground if contrast with
+//                         HEXA background is sufficient, else take the opposite
+//                         of HEXA background
+// - for ASCI chars, if background was never specified (priority == 0), use
+//                   instead HEXA background
+//                   then, if contrast between foreground and background colors
+//                         is insufficient, use HEXA foreground if contrast with
+//                         ASCI background is sufficient, else take the opposite
+//                         of ASCI background
+// - for separator, if contrast with HEXA background is insufficient, use HEXA
+//                  foreground instead
+// - for cursor, if missing or insufficient contrast with HEXA background, force
+//               to opposite of HEXA background
+func (t *theme) fixColorPatterns( ) {
+    if ! isContrastSufficient( &t.colorPatterns[ADDR_AREA_FOREGROUND],
+                                 &t.colorPatterns[ADDR_AREA_BACKGROUND] ) {
+//fmt.Printf(" ADDR insufficient contrast between F & B, setting ADDR F= ~ADDR B\n")
+        setOppositeRGB( &t.colorPatterns[ADDR_AREA_FOREGROUND],
+                            &t.colorPatterns[ADDR_AREA_BACKGROUND] )
+    }
+    if t.colorPatterns[HEXA_AREA_BACKGROUND][colP] == 0 {
+//fmt.Printf(" HEXA undefined B, setting HEXA B= ADDR B\n")
+        t.colorPatterns[HEXA_AREA_BACKGROUND] =
+                                t.colorPatterns[ADDR_AREA_BACKGROUND]
+    }
+    if ! isContrastSufficient( &t.colorPatterns[HEXA_AREA_FOREGROUND],
                                  &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
-        if areColorsDistantEnough( &t.colorPatterns[HEXA_AREA_FOREGROUND],
-                                   &t.colorPatterns[ADDR_AREA_FOREGROUND] ) {
+//fmt.Printf(" HEXA insufficient contrast between F & B, checking ADDR F contrast\n")
+        if isContrastSufficient( &t.colorPatterns[ADDR_AREA_FOREGROUND],
+                                   &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
+//fmt.Printf(" >> sufficient contrast between ADDR F & HEXA B, setting HEXA F= ADDR F\n")
             t.colorPatterns[HEXA_AREA_FOREGROUND] =
                                 t.colorPatterns[ADDR_AREA_FOREGROUND]
         } else  {
-            setOppositeRGB( &t.colorPatterns[HEXA_AREA_BACKGROUND],
-                            &t.colorPatterns[HEXA_AREA_FOREGROUND] )
+//fmt.Printf(" >> INsufficient contrast between ADDR F & HEXA B, setting HEXA F=~HEXA B\n")
+            setOppositeRGB( &t.colorPatterns[HEXA_AREA_FOREGROUND],
+                                &t.colorPatterns[HEXA_AREA_BACKGROUND] )
         }
     }
-    if ! areColorsDistantEnough( &t.colorPatterns[ASCI_AREA_FOREGROUND],
-                                 &t.colorPatterns[ASCI_AREA_BACKGROUND] ) {
-        if areColorsDistantEnough( &t.colorPatterns[ASCI_AREA_FOREGROUND],
-                                   &t.colorPatterns[HEXA_AREA_FOREGROUND] ) {
+    if t.colorPatterns[ASCI_AREA_BACKGROUND][colP] == 0 {
+//fmt.Printf(" ASCI undefined B, setting ASCI B= HEXA B\n")
+        t.colorPatterns[ASCI_AREA_BACKGROUND] =
+                                t.colorPatterns[HEXA_AREA_BACKGROUND]
+    }
+    if ! isContrastSufficient( &t.colorPatterns[ASCI_AREA_FOREGROUND],
+                                &t.colorPatterns[ASCI_AREA_BACKGROUND] ) {
+//fmt.Printf(" ASCI insufficient contrast between F & B, checking HEXA F contrast\n")
+        if isContrastSufficient( &t.colorPatterns[ASCI_AREA_FOREGROUND],
+                                  &t.colorPatterns[HEXA_AREA_FOREGROUND] ) {
+//fmt.Printf(" >> sufficient contrast between HEXA F & ASCI B, setting ASCI F= HEXA F\n")
             t.colorPatterns[ASCI_AREA_FOREGROUND] =
-                            t.colorPatterns[HEXA_AREA_FOREGROUND]
+                                t.colorPatterns[HEXA_AREA_FOREGROUND]
         } else  {
-            setOppositeRGB( &t.colorPatterns[ASCI_AREA_BACKGROUND],
-                            &t.colorPatterns[ASCI_AREA_FOREGROUND] )
+//fmt.Printf(" >> INsufficient contrast between HEXA F & ASCI B, setting ASCI F=~ASCI B\n")
+            setOppositeRGB( &t.colorPatterns[ASCI_AREA_FOREGROUND],
+                                &t.colorPatterns[ASCI_AREA_BACKGROUND] )
         }
+    }
+    if ! isContrastSufficient( &t.colorPatterns[SEPARATOR_FOREGROUND],
+                                &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
+//fmt.Printf(" insufficient contrast between SEPA F & HEXA B, setting SEPA F=HEXA F\n")
+        t.colorPatterns[SEPARATOR_FOREGROUND] =
+                                t.colorPatterns[HEXA_AREA_FOREGROUND]
+    }
+    if ! isContrastSufficient( &t.colorPatterns[CARET_FOREGROUND],
+                                &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
+//fmt.Printf(" insufficient contrast between CARET F & HEXA B, setting CARET F=~HEXA B\n")
+        setOppositeRGB( &t.colorPatterns[CARET_FOREGROUND],
+                                &t.colorPatterns[HEXA_AREA_BACKGROUND] )
     }
 }
 
