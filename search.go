@@ -241,21 +241,23 @@ func updateWrapping( name string ) {
 func hideSearchArea( ) {
     resetMatches(0)
     removeHighlights()
+    releaseSearchFocus( )
     searchArea.Hide( )
-    if pc := getCurrentWorkAreaPageContext(); pc != nil {
-        pc.setPageContentFocus()
-    }
+//    if pc := getCurrentWorkAreaPageContext(); pc != nil {
+//        pc.setPageContentFocus()
+//    }
     wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
     areaVisible = false
 }
 
-func releaseSearchFocus( ) {
+func searchGiveFocus( ) {
     entry := getSearchEntry()
     entry.SelectRegion( 0, 0 )
 }
 
 func setSearchFocus( ) *gtk.Entry {
-    data := transferFocus( MAX_SELECTION_LENGTH )
+    requestSearchFocus( )
+    data := getSelectionData( MAX_SELECTION_LENGTH )
     l := len(data)
     entry := getSearchEntry()
 
@@ -266,13 +268,21 @@ func setSearchFocus( ) *gtk.Entry {
         entry.SetPosition( -1 )
     }
     entry.GrabFocusWithoutSelecting()
+    entry.SetPosition( -1 )
     areaVisible = true
     return entry
 }
 
+// called when main window got focus back while page was not clicked
+func searchGrabFocus( ) {
+    entry := getSearchEntry()
+    entry.GrabFocusWithoutSelecting()
+    entry.SetPosition( -1 )
+}
+
+// called when text entry has been clicked
 func grabFocus( entry *gtk.Entry ) bool {
-//fmt.Printf("Search entry gets focus\n")
-    transferFocus( 0 )
+    requestSearchFocus( )
     return false
 }
 
@@ -448,8 +458,10 @@ func getSearchMatches( ) (size, pos int64, array []int64) {
 
 func updateSearchPosition( bytePos int64 ) {
     searchPos = bytePos
-    updateReplaceButton()
-    selectFirstMatch()
+    if areaVisible {
+        updateReplaceButton()
+        selectFirstMatch()
+    }
 }
 
 func resetMatches( size int ) {
@@ -554,6 +566,8 @@ func (pc *pageContext) findPattern( ) {
 }
 
 func updateSearch( ) {
-    pc := getCurrentPageContext()
-    pc.findPattern( )
+    if areaVisible {
+        pc := getCurrentPageContext()
+        pc.findPattern( )
+    }
 }

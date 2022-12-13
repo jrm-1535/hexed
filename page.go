@@ -461,9 +461,8 @@ fmt.Printf("Pressed mouse button %d\n", evButton )
         return  // TODO: show popup action menu
     }
 
+    requestPageFocus( )
     pc := getCurrentPageContext()
-    pc.setPageContentFocus()
-
     x := buttonEvent.X( )
     y := buttonEvent.Y( )
 
@@ -723,9 +722,9 @@ func (pc *pageContext) scrollPositionFollowCaret( pos int64 ) {
 }
 
 func gotoPos( pos int64 ) {
+    requestPageFocus( )
     pc := getCurrentPageContext()
     pc.setCaretPosition( pos, ABSOLUTE )
-    pc.setPageContentFocus()
     pc.canvas.QueueDraw( )    // force redraw
 }
 
@@ -864,7 +863,6 @@ func drawCaret( pc *pageContext, cr *cairo.Context ) {
         cr.LineTo( x, yStart + float64( ch ) )
         cr.Stroke( )
     }
-//    pc.setPageContentFocus( )
 }
 
 /*
@@ -1247,31 +1245,39 @@ func hasPageFocus( ) bool {
     return false
 }
 
-func (pc *pageContext)setPageContentFocus( ) {
-    releaseSearchFocus( )
-    pc.canvas.GrabFocus( )
-    pc.hideCaret = false
-    clipboardAvail, _ := isClipboardDataAvailable()
-    pasteDataExists( clipboardAvail )
-    selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
+func getSelectionData( maxLen int64 ) ( sel []byte ) {
+    pc := getCurrentWorkAreaPageContext()
+    if pc != nil && maxLen > 0 {
+        s, l := pc.getSelection()
+        if s != -1 {
+            if l > maxLen {
+                l = maxLen
+            }
+            sel = pc.store.getData( s, s + l )
+        }
+    }
+    return
 }
 
-func transferFocus( maxLen int64 ) ( sel []byte ) {
+func pageGrabFocus( ) {
+    pc := getCurrentWorkAreaPageContext()
+    if pc != nil {
+        pc.canvas.GrabFocus( )
+        pc.hideCaret = false
+        clipboardAvail, _ := isClipboardDataAvailable()
+        pasteDataExists( clipboardAvail )
+        selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
+    }
+}
+
+func pageGiveFocus( ) {
     pc := getCurrentWorkAreaPageContext()
     if pc != nil {
         pc.hideCaret = true
-        if maxLen > 0 {
-            s, l := pc.getSelection()
-            if s != -1 {
-                if l > maxLen { l = maxLen }
-                sel = pc.store.getData( s, s + l )
-            }
-        }
         pasteDataExists( false )    // no paste allowed while search has focus
         selectionDataExists( false, true )  // no cut, copy or delete either
         pc.canvas.QueueDraw( )      // force redraw
     }
-    return
 }
 
 // split from init to allow signals access to global context
@@ -1283,7 +1289,7 @@ func (pc *pageContext)activate( ) {
     da := pc.canvas
     da.SetEvents( int(gdk.EXPOSURE_MASK | gdk.BUTTON_PRESS_MASK |
                       gdk.BUTTON_RELEASE_MASK | gdk.KEY_RELEASE_MASK |
-                      gdk.SCROLL_MASK | gdk.POINTER_MOTION_MASK) )
+                      gdk.SCROLL_MASK | gdk.POINTER_MOTION_MASK ) )
 
     da.ConnectAfter( "configure-event", updateScrollFromAreaSizeChange )
     da.Connect( "draw", drawDataLines )

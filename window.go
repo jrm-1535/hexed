@@ -31,9 +31,11 @@ var (
     appStatusId     uint                    // app status area in statusBar
     editLabel       *gtk.Label              // readOnly/readWrite mode
     positionLabel   *gtk.Label              // caret position in page
-    inputModeLabel  *gtk.Label              // ibsert/replace Mode
+    inputModeLabel  *gtk.Label              // insert/replace Mode
 
-//    height, width int                       // window size
+    windowFocus     bool                    // true if main window has focus
+    pageHasFocus    bool                    // true if page has focus
+                                            // within main window
 )
 
 type workArea struct {                      // workArea is
@@ -374,6 +376,57 @@ func exitApplication( win *gtk.Window ) bool {
     return false
 }
 
+// called when mouse button on page
+func requestPageFocus( ) {
+fmt.Printf( "requestPageFocus: previous focus state: window=%t page=%t\n",
+            windowFocus,  pageHasFocus )
+    searchGiveFocus( )  // remove any visible selection
+    pageGrabFocus()
+    pageHasFocus = true
+}
+
+func requestSearchFocus( ) {
+fmt.Printf( "requestSearch Focus: previous focus state: window=%t page=%t\n",
+            windowFocus,  pageHasFocus )
+    if windowFocus {
+        pageGiveFocus( )
+    }
+    pageHasFocus = false
+}
+
+func releaseSearchFocus( ) {
+fmt.Printf("releaseSearch Focus\n")
+fmt.Printf("previous focus state: window=%t page=%t\n", windowFocus,  pageHasFocus )
+    if windowFocus {
+        pageGrabFocus()
+    }
+    pageHasFocus = true
+}
+
+func windowGotFocus( w *gtk.Window, event *gdk.Event ) bool {
+fmt.Printf( "Main window Got focus! previous focus state: window=%t page=%t\n",
+            windowFocus,  pageHasFocus )
+    windowFocus = true
+    if pageHasFocus {
+        pageGrabFocus( )    // hide caret and disable menus
+    } else {
+        searchGrabFocus( )  // ??
+    }
+    return false
+}
+
+func windowLostFocus( w *gtk.Window, event *gdk.Event ) bool {
+fmt.Printf( "Main window lost focus! previous focus state: window=%t page=%t\n",
+            windowFocus,  pageHasFocus )
+    windowFocus = false
+    if pageHasFocus {
+        pageGiveFocus( )    // show caret and enable menus
+    } else {
+        searchGiveFocus( )  // remove any visible selection
+    }
+    return false
+}
+
 func InitApplication( args *hexedArgs ) {
 /* see app.go
     win, err := gtk.ApplicationWindowNew(application)
@@ -431,6 +484,11 @@ func InitApplication( args *hexedArgs ) {
     window.SetPosition(gtk.WIN_POS_MOUSE)
     window.SetResizable( true )
     window.SetDefaultSize(width, height)
+
+    windowFocus = true
+    window.Connect( "focus-out-event", windowLostFocus )
+    window.Connect( "focus-in-event", windowGotFocus )
+
     showWindow()
 
     initTheme()
