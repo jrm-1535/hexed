@@ -452,17 +452,35 @@ func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down 
     return
 }
 
-func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) {
+func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
     buttonEvent := gdk.EventButtonNewFromEvent( event )
     evButton := buttonEvent.Button()
 //    fmt.Printf("Event button=%d\n", evButton)
-    if evButton != gdk.BUTTON_PRIMARY {
-fmt.Printf("Pressed mouse button %d\n", evButton )
-        return  // TODO: show popup action menu
-    }
 
     requestPageFocus( )
     pc := getCurrentPageContext()
+
+    if evButton != gdk.BUTTON_PRIMARY {
+fmt.Printf("Pressed mouse button %d\n", evButton )
+        clipboardAvail, _ := isClipboardDataAvailable()
+        var aNames []string
+        if pc.sel.start == -1 {
+            if clipboardAvail {
+                aNames = []string{ "paste", "selectAll" }
+            } else {
+                aNames = []string{ "selectAll" }
+            }
+        } else {
+            if clipboardAvail {
+                aNames = []string{ "cut", "copy", "paste", "delete" }
+            } else {
+                aNames = []string{ "cut", "copy", "delete" }
+            }
+        }
+        popupContextMenu( aNames, event )
+        return false
+    }
+
     x := buttonEvent.X( )
     y := buttonEvent.Y( )
 
@@ -471,7 +489,7 @@ fmt.Printf("Pressed mouse button %d\n", evButton )
         pc.sel.active = true
         fmt.Printf("extend selection from previous position\n")
         pc.extendSelection( x, y )
-        return
+        return false
     }
 
     index, _, _ := pc.getDataNibbleIndex( x, y )
@@ -483,6 +501,7 @@ fmt.Printf("Pressed mouse button %d\n", evButton )
         pc.sel.active = true
         pc.canvas.QueueDraw( )    // force redraw
     }
+    return false
 }
 
 func (pc *pageContext) extendSelection( x, y float64 ) {

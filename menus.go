@@ -129,6 +129,28 @@ func locateMenuItemByActionName( aName string ) (mi *menuItem) {
     return
 }
 
+func popupContextMenu( aNames []string, event *gdk.Event ) {
+    popUpMenu, err := gtk.MenuNew()
+	if err != nil {
+		log.Fatal("Unable to create context menu:", err)
+	}
+
+    for _, aName := range aNames {
+        mi := locateMenuItemByActionName( aName )
+        textId := mi.getTextId()
+//fmt.Printf( "Adding menu item %s [action %s]\n", localizeText(textId), aName )
+        menuItem, err := gtk.MenuItemNewWithLabel( localizeText(textId) )
+        if err != nil {
+            log.Fatal("Unable to create context menu item:", err)
+        }
+        menuItem.Show()
+//fmt.Printf( "connecting action %s (%p)\n", aName, getActionByName( aName) )
+        menuItem.Connect( "activate", getActionByName( aName) )
+        popUpMenu.Append( menuItem )
+    }
+    popUpMenu.PopupAtPointer( event )
+}
+
 //Because language can change dynamically, menu structure and labels must be saved
 type menuItem struct {
     gtkItem     *gtk.MenuItem
