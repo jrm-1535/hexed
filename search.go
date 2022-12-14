@@ -17,7 +17,6 @@ const (
 var (
     areaVisible     bool                    // is search/replace area visible?
     searchArea      *gtk.Box                // search and replace area
-
     searchBox       *gtk.ComboBox           // search combo box
     searchList      *gtk.ListStore          // search combo box store
 
@@ -211,6 +210,12 @@ func newSearchReplaceArea( ) *gtk.Box {
     wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
     wrapMode.SetTooltipText( "Wrap around" )
 
+    wrapBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
+    if err != nil {
+        log.Fatalf( "newSearchReplaceArea: Unable to create extra button box: %v\n", err )
+    }
+    wrapBox.PackStart( wrapMode, false, false, 0 )
+
     exit, err := gtk.ButtonNewFromIconName( "window-close", gtk.ICON_SIZE_BUTTON )
     if err != nil {
         log.Fatalf("newSearchReplaceArea: could not create exit button: %v\n", err)
@@ -218,13 +223,19 @@ func newSearchReplaceArea( ) *gtk.Box {
     exit.Connect( "button-press-event", hideSearchArea )
     exit.SetTooltipText( "Close search" )
 
+    exitBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
+    if err != nil {
+        log.Fatalf( "newSearchReplaceArea: Unable to create extra button box: %v\n", err )
+    }
+    exitBox.PackStart( exit, false, false, 0 )
+
     searchArea, err = gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
     if err != nil {
         log.Fatalf( "newSearchReplaceArea: Unable to create the search area: %v\n", err )
     }
     searchArea.PackStart( opb, true, true, 0 )
-    searchArea.PackStart( wrapMode, false, false, 0 )
-    searchArea.PackStart( exit, false, false, 0 )
+    searchArea.PackStart( wrapBox, false, false, 0 )
+    searchArea.PackStart( exitBox, false, false, 0 )
 
     registerForChanges( WRAP_MATCHES, updateWrapping )
 //fmt.Printf( "newSearchArea: created search area")
@@ -243,9 +254,6 @@ func hideSearchArea( ) {
     removeHighlights()
     releaseSearchFocus( )
     searchArea.Hide( )
-//    if pc := getCurrentWorkAreaPageContext(); pc != nil {
-//        pc.setPageContentFocus()
-//    }
     wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
     areaVisible = false
 }
@@ -317,7 +325,6 @@ func incrementalSearch( entry *gtk.Entry ) {
     if err != nil {
         panic("Cannot get entry text\n")
     }
-//    fmt.Printf("entry changed=\"%s\"\n", text)
     findCurrentText( text )
 }
 
@@ -330,7 +337,6 @@ func highlightSearchResults( showReplace bool ) {
         replaceOp.Hide( )
     }
     removeHighlights()
-
     entry := setSearchFocus()
     incrementalSearch( entry )
 }
