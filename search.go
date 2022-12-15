@@ -3,6 +3,7 @@ package main
 import (
     "log"
     "fmt"
+    "strings"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gdk"
@@ -175,19 +176,19 @@ func newSearchReplaceArea( ) *gtk.Box {
                                  incrementalSearch )
 
     next.Connect( "clicked", findNext  )
-    next.SetTooltipText( "Next match" )
+    next.SetTooltipText( "Go to next match" )
     addToWindowShortcuts( next, "clicked", 'g', gdk.CONTROL_MASK )
 
     previous.Connect( "clicked", findPrevious  )
     addToWindowShortcuts( previous, "clicked", 'g',
                           gdk.CONTROL_MASK | gdk.SHIFT_MASK )
-    previous.SetTooltipText( "Previous match" )
+    previous.SetTooltipText( "Go to previous match" )
 
     replaceOp, replaceBox, replaceList, replace, replaceAll =
                newOperationBox( replacePrompt, buttonReplace, buttonReplaceAll,
-                                nil )
+                                updateReplaceTooltip )
     replace.Connect( "clicked", replaceMatch )
-    replace.SetTooltipText( "Replace match" )
+    replace.SetTooltipText( "Replace current match" )
     replaceAll.Connect( "clicked", replaceAllMatches )
     replaceAll.SetTooltipText( "Replace all matches" )
 
@@ -289,8 +290,15 @@ func searchGrabFocus( ) {
 }
 
 // called when text entry has been clicked
-func grabFocus( entry *gtk.Entry ) bool {
+func grabFocus( entry *gtk.Entry, event *gdk.Event ) bool {
+    buttonEvent := gdk.EventButtonNewFromEvent( event )
+    evButton := buttonEvent.Button()
+
     requestSearchFocus( )
+    if evButton != gdk.BUTTON_PRIMARY {
+//        fmt.Printf("Pressed mouse button %d\n", evButton )
+        return true
+    }
     return false
 }
 
@@ -299,7 +307,7 @@ func BytesFromHexString( l int, s string ) (res []byte) {
     if l & 1 == 1 {
         panic( "BytesFromHexString: len is odd\n" )
     }
-    fmt.Printf("BytesFromHexString: input=\"%s\"\n", s)
+//    fmt.Printf("BytesFromHexString: input=\"%s\"\n", s)
     res = make( []byte, l >> 1 )
     for i := 0; i < l; i += 2 {
         b := getNibbleFromHexDigit( s[i] )
@@ -307,25 +315,58 @@ func BytesFromHexString( l int, s string ) (res []byte) {
         b += getNibbleFromHexDigit( s[i+1] )
         res[ i >> 1 ] = b
     }
-    fmt.Printf( "BytesFromHexString: result=%s\n", string(res))
+//    fmt.Printf( "BytesFromHexString: result=%s\n", string(res))
     return
 }
 
-func findCurrentText( text string ) {
-    // TODO: disable next/previous if odd length, enable is even length
+func getAsciiMarkupFromData( data []byte ) string {
+    var b strings.Builder
+    b.WriteString( `<span foreground="red" style="italic">ASCII</span> «` )
+    l := len(data)
+fmt.Printf("getAsciiTextFromData: l=%d data=%v\n", l, data )
+    for i := 0; i < l; i ++ {
+        c := data[i]
+        if c == '\n' {
+            b.WriteString( "↩" )
+        } else if c == '\t' {
+            b.WriteString( "↹" )
+        } else {
+            if c < ' ' || c > '~' {
+                c = '.'
+            }
+            b.WriteByte( c )
+        }
+    }
+    b.WriteString( "»" )
+    return b.String()
+}
+
+func updateReplaceTooltip( entry *gtk.Entry ) {
+    text, err := entry.GetText()
+    if err != nil {
+        log.Fatal("updateReplaceTooltip: cannot get entry text:", err)
+    }
     l := (len(text) >> 1) << 1
-    pattern = BytesFromHexString( l, text )
-    pc := getCurrentPageContext()
-    pc.findPattern( )
+    rs := BytesFromHexString( l, text )
+    asciiMarkup := getAsciiMarkupFromData( rs )
+    entry.SetTooltipMarkup( asciiMarkup )
     updateReplaceButton()
 }
 
 func incrementalSearch( entry *gtk.Entry ) {
     text, err := entry.GetText()
     if err != nil {
-        panic("Cannot get entry text\n")
+        log.Fatal("incrementalSearch: cannot get entry text:", err)
     }
-    findCurrentText( text )
+
+    l := (len(text) >> 1) << 1
+    pattern = BytesFromHexString( l, text )
+    asciiMarkup := getAsciiMarkupFromData( pattern )
+    entry.SetTooltipMarkup( asciiMarkup )
+
+    pc := getCurrentPageContext()
+    pc.findPattern( )
+    updateReplaceButton()
 }
 
 func highlightSearchResults( showReplace bool ) {
@@ -348,16 +389,26 @@ func searchFind( ) {
 
 func updateReplaceButton( ) {
     if replaceOp.IsVisible() {
-        if isMatchSelected() {
-            replace.SetSensitive( true )
-        } else {
-            replace.SetSensitive( false )
+        entry := getReplaceEntry()
+        text, err := entry.GetText()
+        if err != nil {
+            log.Fatal("updateReplaceButton: cannot get entry text:", err)
+        }
+        if len(text) & 1 == 0 {
+            if isMatchSelected() {
+                replace.SetSensitive( true )
+            }
+            replaceAll.SetSensitive( true )
+            return
         }
     }
+    replace.SetSensitive( false )
+    replaceAll.SetSensitive( false )
 }
 
 func findNext( button *gtk.Button ) bool {
 //    fmt.Printf( "Button Released on next!\n")
+    requestSearchFocus( )   // to make sure focus is not on main area anymore
     appendSearchText()
     selectNewMatch( true )
     updateReplaceButton()
@@ -366,6 +417,7 @@ func findNext( button *gtk.Button ) bool {
 
 func findPrevious( button *gtk.Button ) bool {
 //    fmt.Printf( "Button Released on previous!\n")
+    requestSearchFocus( )   // to make sure focus is not on main area anymore
     appendSearchText()
     selectNewMatch( false )
     updateReplaceButton()
@@ -380,6 +432,7 @@ func searchReplace( ) {
 
 func replaceMatch( button *gtk.Button ) bool {
     fmt.Printf( "Button Released on replace!\n")
+    requestSearchFocus( )   // to make sure focus is not on main area anymore
     entry := getReplaceEntry()
     text, err := entry.GetText()
     if err != nil {
@@ -398,6 +451,7 @@ func replaceMatch( button *gtk.Button ) bool {
 
 func replaceAllMatches( button *gtk.Button ) bool {
     fmt.Printf( "Button Released on replace all!\n")
+    requestSearchFocus( )   // to make sure focus is not on main area anymore
     entry := getReplaceEntry()
     text, err := entry.GetText()
     if err != nil {

@@ -976,6 +976,9 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
             if d == '\n' {
                 cr.ShowText( "↩" )
                 continue
+            } else if d == '\t' {
+                cr.ShowText( "↹" )
+                continue
             } else if d < ' ' || d > '~' {
                 d = '.'
             }
