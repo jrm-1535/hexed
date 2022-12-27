@@ -600,7 +600,7 @@ func (exp *explore)getExploreFloatValue( size int ) string {
     panic("Unknown float size\n")
 }
 
-func (exp *explore) evaluateValuesWithEndianness( ) {
+func (exp *explore) updateValuesWithEndianness( ) {
     names := [...]string{ "SIGNED", "UNSIGNED", "HEXA", "OCTAL" }
     sizes := [...]int{ 16, 32, 64 }
     suffixes := [...]string{ "16", "32", "64" }
@@ -634,7 +634,7 @@ fmt.Printf("Setting endianess to %s\b", endianName)
             pref[name] = false
         }
         update( pref )
-        exp.evaluateValuesWithEndianness( )
+        exp.updateValuesWithEndianness( )
     }
 
     var initialVal string
