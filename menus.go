@@ -79,7 +79,7 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
             false, -1, -1, -1, -1 },
         { "selectAll", accelCode{ 'a', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
             false, menuEditSelect, menuEditSelectHelp, -1, -1 },
-        { "Explore", accelCode{ 'e', gdk.MOD1_MASK, gtk.ACCEL_VISIBLE },
+        { "explore", accelCode{ 'e', gdk.CONTROL_MASK | gdk.MOD1_MASK, gtk.ACCEL_VISIBLE },
             false, menuEditExplore, menuEditExploreHelp, -1, -1 },
         { "", accelCode{ 0, 0, 0 },
             false, -1, -1, -1, -1 },
@@ -127,6 +127,20 @@ func locateMenuItemByActionName( aName string ) (mi *menuItem) {
         panic( "Unable to locate menu Item by action name\n" )
     }
     return
+}
+
+func addPopupMenuItem( aName string, textId int, fct func() ) {
+    if _, ok := menuItems[aName]; ok {
+        panic( fmt.Sprintf("addPopupMenuItem: item already exists for action name <%s>\n", aName ) )
+    }
+    menuItems[ aName ] = &menuItem{ nil, aName, false, textId, 0, 0, 0 }
+    addAction( aName, fct )
+}
+
+func delPopupMenuItem( aName string ) {
+//fmt.Printf("delPopupMenuItem: deleting action name <%s>\n", aName )
+    delete( menuItems, aName )
+    delAction( aName )
 }
 
 func popupContextMenu( aNames []string, event *gdk.Event ) {

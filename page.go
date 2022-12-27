@@ -87,6 +87,27 @@ func (pc *pageContext) getSelection() ( s, l int64) {
     return
 }
 
+func getBytesAtCaret( nBytes int64 ) (data[]byte, bitOffset int) {
+    pc := getCurrentPageContext()
+    byteLen := pc.store.length()
+    bytePos := pc.caretPos >> 1
+    if nBytes == 0 || bytePos + nBytes > byteLen {
+        nBytes = byteLen - bytePos
+    }
+    data = pc.store.getData( bytePos, bytePos + nBytes )
+    if pc.caretPos & 1 == 1 {
+        bitOffset = 4
+    }
+    return
+}
+
+func getByteSizeFromCaret( ) int64 {
+    pc := getCurrentPageContext()
+    byteLen := pc.store.length()
+    bytePos := pc.caretPos >> 1
+    return byteLen - bytePos
+}
+
 func redrawPage( ) {
     if pc := getCurrentWorkAreaPageContext(); pc != nil {
         pc.canvas.QueueDraw( )
@@ -452,6 +473,35 @@ func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down 
     return
 }
 
+func (pc *pageContext) showContextPopup( event  *gdk.Event ) {
+    clipboardAvail, _ := isClipboardDataAvailable()
+    var aNames []string
+
+    if pc.sel.start == -1 {
+        nBytes := getByteSizeFromCaret()
+        if clipboardAvail {
+            if nBytes > 0 {
+                aNames = []string{ "explore", "paste", "selectAll" }
+            } else {
+                aNames = []string{ "paste", "selectAll" }
+            }
+        } else {
+            if nBytes > 0 {
+                aNames = []string{ "explore", "selectAll" }
+            } else {
+                aNames = []string{ "selectAll" }
+            }
+        }
+    } else {
+        if clipboardAvail {
+            aNames = []string{ "cut", "copy", "paste", "delete" }
+        } else {
+            aNames = []string{ "cut", "copy", "delete" }
+        }
+    }
+    popupContextMenu( aNames, event )
+}
+
 func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
     buttonEvent := gdk.EventButtonNewFromEvent( event )
     evButton := buttonEvent.Button()
@@ -462,23 +512,8 @@ func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
 
     if evButton != gdk.BUTTON_PRIMARY {
 fmt.Printf("Pressed mouse button %d\n", evButton )
-        clipboardAvail, _ := isClipboardDataAvailable()
-        var aNames []string
-        if pc.sel.start == -1 {
-            if clipboardAvail {
-                aNames = []string{ "paste", "selectAll" }
-            } else {
-                aNames = []string{ "selectAll" }
-            }
-        } else {
-            if clipboardAvail {
-                aNames = []string{ "cut", "copy", "paste", "delete" }
-            } else {
-                aNames = []string{ "cut", "copy", "delete" }
-            }
-        }
-        popupContextMenu( aNames, event )
-        return false
+        pc.showContextPopup( event )
+        return true
     }
 
     x := buttonEvent.X( )
@@ -946,7 +981,6 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
     cw, ch, _ := getCharSizes( )
     for {
         cr.MoveTo( 0.0, lineYPos )
-//        cr.SetSource( pc.add.fgPattern )
         setAddForegroundColor( cr )
         cr.ShowText( fmt.Sprintf( pc.addFmt, address ) )
 
@@ -959,7 +993,6 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
             beyond = dataLen
         }
         line := pc.store.getData( address, beyond )
-//        cr.SetSource( pc.hex.fgPattern )
         setHexForegroundColor( cr )
         var ( i int; d byte )
         for i, d = range line {
@@ -970,7 +1003,6 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
             cr.ShowText( "   " )
         }
         cr.ShowText( " " )
-//        cr.SetSource( pc.asc.fgPattern )
         setAscForegroundColor( cr )
         for _, d = range line {
             if d == '\n' {
@@ -996,7 +1028,6 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
         xStart := float64(cw) * (float64(pc.addLen) + 0.5)
         xInc := float64(3 * sepSpan * cw)
         cr.SetLineWidth( 2.0 )
-    //    cr.SetSourceRGB( 0.3, 0.3, 0.3 )
         setSeparatorColor( cr )
         for i := 0; i <= nBL; i += sepSpan {
             cr.MoveTo( xStart, 0.0 )
@@ -1015,6 +1046,7 @@ func (pc *pageContext)setStorage( path string ) (err error) {
 
     var updateStoreLength = func( l int64 ) {
         dataExists( l > 0 )
+        explorePossible( pc.caretPos < ( l << 1 ) )
         nLines := (l + int64(pc.nBytesLine) -1) / int64(pc.nBytesLine)
 
 //fmt.Printf("updateStoreLength: nLines.previous=%d, .new=%d\n", pc.nLines, nLines )
@@ -1025,7 +1057,9 @@ func (pc *pageContext)setStorage( path string ) (err error) {
         pc.store.setNotifyDataChange( updateSearch )
         pc.store.setNotifyLenChange( updateStoreLength )
         pc.store.setNotifyUndoRedoAble( undoRedoUpdate )
-        dataExists( pc.store.length() > 0 )
+        l := pc.store.length()
+        dataExists( l > 0 )
+        explorePossible( pc.caretPos < ( l << 1 ) )
     }
     return
 }
@@ -1035,10 +1069,7 @@ func reloadPageContent( path string ) {
     err := pc.store.reload( path )
     if err == nil {
         pc.showBytePosition()
-//        dataExists( pc.store.length( ) > 0 )
-//        undoRedoUpdate( false, false )
         pc.setCaretPosition( -1, END )  // set caret at 0
-//        pc.findPattern( false )
         pc.canvas.QueueDraw( )          // force redraw
     }
 }
@@ -1336,7 +1367,6 @@ func getPageDefaultSize( ) (minWidth, minHeight int) {
 
 func updateLineSizeFromPreferencesChange( ) {
     if pc := getCurrentWorkAreaPageContext(); pc != nil {
-        fmt.Printf("updateLineSizeFromPreferencesChange: TODO\n")
         minNBL := getIntPreference( MIN_BYTES_LINE )
         maxNBL := getIntPreference( MAX_BYTES_LINE )
 
@@ -1359,11 +1389,17 @@ func updateLineSizeFromPreferencesChange( ) {
 //fmt.Printf("current nBytesLines= %d minNBL=%d nBLInc=%d offset=%d\n",
 //           pc.nBytesLine, minNBL, nBLInc, offset)
             } else {
+//fmt.Printf("Ignoring change, current nBytesLines= %d minNBL=%d nBLInc=%d offset=%d\n",
+//           pc.nBytesLine, minNBL, nBLInc, offset)
+                minWidth, minHeight := pc.getMinAreaSize()
+//fmt.Printf("Setting size request to %d, %d\n", minWidth, minHeight )
+                pc.canvas.SetSizeRequest( minWidth, minHeight )
                 return      // no effect on nBytesLine
             }
         }
         nL := pc.calculateNumberOfLines( nBL )
         minWidth, minHeight := pc.getMinAreaSize()
+//fmt.Printf("Setting size request to %d, %d\n", minWidth, minHeight )
         pc.canvas.SetSizeRequest( minWidth, minHeight )
         pc.updateScrollFromDataGridChange( nBL, nL )
     }

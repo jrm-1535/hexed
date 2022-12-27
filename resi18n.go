@@ -27,6 +27,8 @@ const (
     noMatch
     nMatches
 
+    actionCopyValue
+
     menuFile
     menuEdit
     menuSearch
@@ -104,8 +106,8 @@ const (
     menuHelpAbout
     menuHelpAboutHelp
 
-// preferences
     windowTitlePreferences
+    windowTitleExplore
 
     dialogPreferencesEditorTab
     dialogPreferencesSaveTab
@@ -136,6 +138,36 @@ const (
 
     dialogPreferencesTheme
     dialogPreferencesThemeName
+
+    dialogExploreBitStream
+    dialogExploreBitStreamFirstBit
+    dialogExploreBitStreamNumberBits
+
+    dialogExploreBitStreamMSB
+    dialogExploreBitStreamMSBFirst
+    dialogExploreBitStreamMSBLast
+
+    dialogExploreBitStreamBinary
+    dialogExploreHexa
+    dialogExploreOctal
+
+    dialogExploreSigned
+    dialogExploreUnsigned
+
+    dialogExploreValues
+    dialogExploreEndian
+    dialogExploreEndianBig
+    dialogExploreEndianLittle
+
+    dialogExploreInt
+    dialogExploreInt8
+    dialogExploreInt16
+    dialogExploreInt32
+    dialogExploreInt64
+
+    dialogExploreReal
+    dialogExploreFloat32
+    dialogExploreFloat64
 
     buttonOk
     buttonCancel
@@ -185,6 +217,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Match %d of %d",                                       // match
     "No matches found",                                     // noMatch
     "%d matches",                                           // nMatches
+
+    "copy value",                                           // actionCopyValue
 
     // prefix with '_' for menu shortcut
     "_File",                                                // menuFile
@@ -265,6 +299,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "about Hexed",                                          // menuHelpAboutHelp
 
     "Preferences",                                          // windowTitlePreferences
+    "Explore",                                              // windowTitleExplore
 
     "Editor",                                               // dialogPreferencesEditorTab
     "Save",                                                 // dialogPreferencesSaveTab
@@ -287,7 +322,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Start in replace mode",                                // dialogPreferencesEditorReplaceNode
 
     "Search",                                               // dialogPreferencesSearch
-    "Start in wraparound mode",                             // dialogPreferencesSearchWrapAround
+    "Start in wrap around mode",                            // dialogPreferencesSearchWrapAround
     "show replace bytes as ASCII too",                      // dialogPreferencesSearchShowAsciiReplace
 
     "Updating",                                             // dialogPreferencesSave
@@ -295,6 +330,36 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Theme",                                                // dialogPreferencesTheme
     "Select name",                                          // dialogPreferencesThemeName
+
+    "Bitstream",                                            // dialogExploreBitStream
+    "First Bit",                                            // dialogExploreBitStreamFirstBit
+    "Number of bits",                                       // dialogExploreBitStreamNumberBits
+
+    "Most significant bit",                                 // dialogExploreBitStreamMSB
+    "first",                                                // dialogExploreBitStreamMSBFirst
+    "Last",                                                 // dialogExploreBitStreamMSBLast
+
+    "Binary",                                               // dialogExploreBitStreamBinary
+    "Hexadecimal",                                          // dialogExploreHexa
+    "Octal",                                                // dialogExploreOctal
+
+    "Signed",                                               // dialogExploreSigned
+    "Unsigned",                                             // dialogExploreUnsigned
+
+    "Values",                                               // dialogExploreValues
+    "Endianness",                                           // dialogExploreEndian
+    "Big endian",                                           // dialogExploreEndianBig
+    "little endian",                                        // dialogExploreEndianLittle
+
+    "Integer",                                              // dialogExploreInt
+    "8 bit",                                                // dialogExploreInt8
+    "16 bit",                                               // dialogExploreInt16
+    "32 bit",                                               // dialogExploreInt32
+    "64 bit",                                               // dialogExploreInt64
+
+    "Real",                                                 // dialogExploreReal
+    "float 32",                                             // dialogExploreFloat32
+    "float 64",                                             // dialogExploreFloat64
 
     "Yes",                                                  // buttonOk
     "Cancel",                                               // buttonCancel
@@ -332,6 +397,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Place %d sur %d",                                      // match
     "Introuvable",                                          // noMatch
     "%d places",                                            // nMatches
+
+    "copier la valeur",                                     // actionCopyValue
 
     "_Fichier",                                             // menuFile / prefix with '_' for menu shortcut
     "_Edit",                                                // menuEdit
@@ -411,6 +478,7 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "à propos d'hexed",                                     // menuHelpAboutHelp
 
     "Préférences",                                          // windowTitlePreference
+    "Explorer",                                             // windowTitleExplore
 
     "Editeur",                                              // dialogPreferencesEditorTab
     "Enregistrer",                                          // dialogPreferencesSaveTab
@@ -441,6 +509,37 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Thème",                                                // dialogPreferencesTheme
     "Choisissez le thème",                                  // dialogPreferencesThemeName
+
+    "Chaine de bits",                                       // dialogExploreBitStream
+    "Premier bit",                                          // dialogExploreBitStreamFirstBit
+    "Nombre de bits",                                       // dialogExploreBitStreamNumberBits
+
+    "Bit plus significatif",                                // dialogExploreBitStreamMSB
+    "en premier",                                           // dialogExploreBitStreamMSBFirst
+    "en dernier",                                           // dialogExploreBitStreamMSBLast
+
+    "Binaire",                                              // dialogExploreBitStreamBinary
+    "Hexdecimale",                                          // dialogExploreHexa
+    "Octale",                                               // dialogExploreOctal
+
+    "Signé",                                                // dialogExploreSigned
+    "Non-signé",                                            // dialogExploreUnsigned
+
+    "Valeurs",                                              // dialogExploreValues
+    "Boutisme",                                             // dialogExploreEndian
+    "Gros-boutiste",                                        // dialogExploreEndianBig
+    "Petit-boutiste",                                       // dialogExploreEndianLittle
+
+    "Entier",                                               // dialogExploreInt
+    "Reél",                                                 // dialogExploreReal
+
+    "8 bits",                                               // dialogExploreInt8
+    "16 bits",                                              // dialogExploreInt16
+    "32 bits",                                              // dialogExploreInt32
+    "64 bits",                                              // dialogExploreInt64
+
+    "float 32",                                             // dialogExploreFloat32
+    "float 64",                                             // dialogExploreFloat64
 
     "Oui",                                                  // buttonOk
     "Annuler",                                              // buttonCancel

@@ -20,6 +20,14 @@ func act( name string ) {
     }
 }
 
+func addAction( name string, f func() ) {
+    actions[name] = f
+}
+
+func delAction( name string ) {
+    delete( actions, name )
+}
+
 func initActions( nItems int ) {
 
     actions = make( map[string]func(), nItems )
@@ -52,16 +60,11 @@ func initActions( nItems int ) {
     actions["paste"] = pasteClipboard
     actions["delete"] = deleteSelection
     actions["selectAll"] = selectAll
-
-
-//    actions["explore"] =
-
-    preferencesAction := func ( ) {
-        fmt.Printf( "preferences called\n" )
-        showPreferencesDialog()
-
+    actions["explore"] = func () {
+        showExploreDialog( getBytesAtCaret( 0 ) )
     }
-    actions["preferences"] = preferencesAction
+
+    actions["preferences"] = showPreferencesDialog
 
     languageAction := func( ) {
         fmt.Printf( "language called\n" )
@@ -95,6 +98,10 @@ func initActions( nItems int ) {
     actions["about"] = aboutAction
 }
 
+func enablePreferences( state bool ) {
+    enableMenuItem( "preferences", state )
+}
+
 func pageExists( state bool ) {
     enableMenuItem( "close", state )
     if state == false {
@@ -109,6 +116,10 @@ func pageExists( state bool ) {
 func fileExists( state bool ) {
     enableMenuItem( "save", state )
     enableMenuItem( "revert", state )
+}
+
+func explorePossible( state bool ) {
+    enableMenuItem( "explore", state )
 }
 
 func dataExists( state bool ) {

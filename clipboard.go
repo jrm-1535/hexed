@@ -145,7 +145,7 @@ func writeHexDigitsFromSlice( out []byte, data []byte ) {
     }
 }
 
-// save binary data into hex chars, prefixed with "0x"
+// save binary data bytes into hex chars
 func setClipboardData( data []byte ) {
 // TODO: when available in gotk3, use setWithOwner instead of immediate copy here
     l := len( data )
@@ -153,5 +153,10 @@ func setClipboardData( data []byte ) {
     b := make( []byte, l * 2 )  // 2 char per data byte
     writeHexDigitsFromSlice( b, data )
     clipBoard.cb.SetText( string(b) )
+    pasteDataExists( true )
+}
+
+func setClipboardAscii( s string ) {
+    clipBoard.cb.SetText( s )
     pasteDataExists( true )
 }

@@ -76,6 +76,7 @@ const (
     REPLACE_AS_ASCII = "replace_string_as_ascii"
     CREATE_BACKUP_FILES = "create_backup_files"
     COLOR_THEME_NAME = "theme_name"
+    BIG_ENDIAN_NAME = "big_endian"
 )
 
 func writeDefault( ) {
@@ -92,7 +93,8 @@ func writeDefault( ) {
                 WRAP_MATCHES: true,
                 REPLACE_AS_ASCII: false,
                 CREATE_BACKUP_FILES: false,
-                COLOR_THEME_NAME: "hexed Dark",
+                COLOR_THEME_NAME: "Hexed Dark",
+                BIG_ENDIAN_NAME: true,
     }
 
 //    data["created"] = GetNowAsISO8601UTC()

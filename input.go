@@ -35,6 +35,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     pageSize := int64(adj.GetPageSize())
     pageNibbles := (pageSize / int64(getCharHeight())) *
                                     int64(pc.nBytesLine << 1)
+    dataNibbles := pc.store.length() << 1
 
     if pc.sel.start != -1 {
         if unit < END && offset == 1  {     // next char, line or page starts at
@@ -48,8 +49,8 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
         nPos := pc.caretPos + int64(offset)
         if nPos < 0 {
             nPos = 0
-        } else if nPos > pc.store.length() << 1 {
-            nPos = pc.store.length() << 1
+        } else if nPos > dataNibbles {
+            nPos = dataNibbles
         }
         pc.scrollPositionFollowCaret( nPos )
 
@@ -58,7 +59,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
             panic("Bad offset for LINE\n")
         }
         nPos := pc.caretPos + (offset * int64(pc.nBytesLine << 1))
-        if nPos >= 0 && nPos <= pc.store.length() << 1 {
+        if nPos >= 0 && nPos <= dataNibbles {
             pc.scrollPositionFollowCaret( nPos )
         }
 
@@ -67,7 +68,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
             panic("Bad offset for PAGE\n")
         }
         nPos := pc.caretPos + int64(offset) * pageNibbles
-        if nPos >= 0 && nPos <= pc.store.length() << 1 {
+        if nPos >= 0 && nPos <= dataNibbles {
             pc.scrollPositionFollowPage( nPos, float64( int64(offset) * pageSize) )
         }
 
@@ -79,7 +80,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
             pc.caretPos = 0
             origin = 0
         } else if offset == +1 {
-            pc.caretPos = pc.store.length() << 1
+            pc.caretPos = dataNibbles
             origin = end - pageSize
         } else {
             panic("Bad offset for END\n")
@@ -92,6 +93,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     } else {
         pc.setOddCaretNoPending()
     }
+    explorePossible( pc.caretPos < dataNibbles )
     updateSearchPosition( pc.caretPos >> 1 )
 }
 
@@ -764,9 +766,13 @@ func editAtCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
 // caret position in hexArea is expressed in nibbles (0.5 byte)
 // it takes 2 * nBytesLine to reach the end of a line
     keyEvent := gdk.EventKeyNewFromEvent(event)
-//    fmt.Printf( "key released: val 0x%04x\n", keyEvent.KeyVal( ) )
-    pc := getCurrentPageContext()
+    modifiers := keyEvent.State()
+//fmt.Printf("Key modifiers=%#04x\n", modifiers)
+    if modifiers & 0x0f != 0 {
+        return false
+    }
     keyVal := keyEvent.KeyVal()
+    pc := getCurrentPageContext()
     switch keyVal {
     case HOME_KEY:
         pc.setCaretPosition( -1, END )
