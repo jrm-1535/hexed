@@ -18,14 +18,10 @@ import (
 */
 
 var (
-//    application     *gtk.Application        // application with
-//    window          *gtk.ApplicationWindow  // a single window made of
     window          *gtk.Window
     shortcuts       *gtk.AccelGroup
     menus           *menu                   // a menu bar
-
     mainArea        *workArea               // a main work area
-
     statusBar       *gtk.Statusbar          // a status bar
     menuHintId      uint                    // menu hint area in statusBar
     appStatusId     uint                    // app status area in statusBar
@@ -47,6 +43,30 @@ type page struct {                          // a page is made of
     label   *gtk.Label                      // one notebook tab label
     context *pageContext                    // page context
     path    string                          // page file path
+}
+/*
+func printPagePaths( ) {
+    for _, pg := range mainArea.pages {
+        fmt.Printf(" path %s\n", pg.path)
+    }
+}
+*/
+func reorderPages( to, from int ) int {
+//    fmt.Printf( "Before move:\n" )
+//    printPagePaths()
+
+    fromPage := mainArea.pages[from]
+    if from > to {
+        copy( mainArea.pages[to+1:from+1], mainArea.pages[to:from] )
+        mainArea.pages[to] = fromPage
+    } else if from < to {
+        copy( mainArea.pages[from:to], mainArea.pages[from+1:to+1] )
+        mainArea.pages[to] = fromPage
+    }
+//    fmt.Printf( "page %d moved to %d\n", from, to )
+//    fmt.Printf( "After move:\n" )
+//    printPagePaths()
+    return to
 }
 
 func getCurrentWorkAreaPage( ) *page {
@@ -206,7 +226,6 @@ func showNoPageVisual( ) {
     editLabel.SetLabel( "" )
 }
 
-// TODO: experiment with notebook re-ordering
 func (wa *workArea)removePage( pageIndex int ) {
     nPages := len(wa.pages)
     if pageIndex < 0 || pageIndex > nPages {
@@ -224,18 +243,71 @@ func (wa *workArea)removePage( pageIndex int ) {
     }
 }
 
+func closeTab( pg *page ) bool {
+//    fmt.Printf( "Closing Tab for page %s\n", pg.label.GetLabel() )
+    for i, p := range mainArea.pages {
+        if pg == p {
+//            fmt.Printf( ">> Page number %d (path <%s>)\n", i, p.path )
+            mainArea.removePage(i)
+            break
+        }
+    }
+    return true
+}
+
+func makeTab( pg *page ) *gtk.Box {
+    box, err := gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
+    if nil != err {
+        log.Fatal("makeTab: Could not create tab box", err)
+    }
+    quit, err := gtk.LabelNew( "" )
+    quit.SetMarkup( "<span face=\"monospace\" weight=\"bold\"> x </span>")
+    eb, err := gtk.EventBoxNew( )
+    if err != nil {
+        log.Fatalf("makeTab: could not create event box: %v", err)
+    }
+    enter := func( eventbox *gtk.EventBox, event *gdk.Event ) bool {
+        quit.SetMarkup( "<span face=\"monospace\" fgcolor=\"red\" weight=\"bold\"> x </span>")
+        return true
+    }
+    leave := func( eventbox *gtk.EventBox, event *gdk.Event ) bool {
+        quit.SetMarkup( "<span face=\"monospace\" weight=\"bold\"> x </span>")
+        return true
+    }
+    eb.Connect( "enter_notify_event", enter )
+    eb.Connect( "leave_notify_event", leave )
+    eb.SetTooltipText( "Close file" )
+
+    eb.SetAboveChild( true )
+    cls := func( eventbox *gtk.EventBox, event *gdk.Event ) bool {
+        return closeTab( pg )
+    }
+    eb.Connect( "button_press_event", cls )
+    eb.Add( quit )
+
+    box.PackStart( pg.label, true, true, 0)
+    box.PackStart( eb, false, false, 0)
+    box.ShowAll( )
+    return box
+}
+
 func (wa *workArea)appendPage( widget *gtk.Widget,
                                label *gtk.Label,
                                context *pageContext,
                                path string ) (pageIndex int) {
-    if pageIndex = wa.notebook.AppendPage( widget, label ); -1 == pageIndex {
+
+    pg := new( page )
+    pg.label = label
+    pg.context = context
+    pg.path = path
+
+    tab := makeTab( pg )
+    if pageIndex = wa.notebook.AppendPage( widget, tab ); -1 == pageIndex {
         log.Fatalf( "appendPage: Unable to append page\n" )
     }
-    page := new( page )
-    page.label = label
-    page.context = context
-    page.path = path
-    wa.pages = append( wa.pages, page )
+
+    wa.notebook.SetTabReorderable( widget, true )
+    wa.pages = append( wa.pages, pg )
     return
 }
 
@@ -245,17 +317,6 @@ func (wa *workArea)selectPage( pageIndex int ) {
                     pageIndex, len(wa.pages) )
     }
     wa.notebook.SetCurrentPage( pageIndex )
-//    wa.pages[ pageIndex ].context.refresh( )
-}
-
-func switchPage( ntbk *gtk.Notebook, wdg *gtk.Widget, pageIndex int ) bool {
-fmt.Printf("changePage: page index %d\n", pageIndex)
-    if pageIndex < len(mainArea.pages) {
-        page := mainArea.pages[ pageIndex ]
-        page.context.refresh( )
-        fileExists( page.path != "" )
-    }
-    return false
 }
 
 func (wa *workArea)getBin() *gtk.Widget {
@@ -306,9 +367,30 @@ func newWorkArea( ) (*workArea, error) {
     if err != nil {
         return nil, err
     }
+    ntbk.SetTabPos( gtk.POS_TOP)
+
+    var pageNumber int
+    switchPage := func( nb *gtk.Notebook,
+                        child *gtk.Widget, num uint ) bool {
+//        fmt.Printf("changePage: page index %d\n", num)
+        pageNumber = int(num)
+        if pageNumber < len(mainArea.pages) {
+            page := mainArea.pages[ pageNumber ]
+            page.context.refresh( )
+            fileExists( page.path != "" )
+        }
+        return false
+    }
+
+    pageReordered := func( nb *gtk.Notebook,
+                           child *gtk.Widget, num uint ) {
+        pageNumber = reorderPages( int(num), pageNumber )
+    }
+    ntbk.ConnectAfter( "switch-page", switchPage )
+    ntbk.Connect( "page-reordered", pageReordered )
+
     wa := new( workArea )
     wa.notebook = ntbk  // no pages yet
-    ntbk.ConnectAfter( "switch-page", switchPage )
     return wa, nil
 }
 
