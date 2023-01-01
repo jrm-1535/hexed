@@ -365,6 +365,7 @@ func incrementalSearch( entry *gtk.Entry ) {
     entry.SetTooltipMarkup( asciiMarkup )
 
     pc := getCurrentPageContext()
+fmt.Printf("incrementalSearch calling findPattern\n")
     pc.findPattern( )
     updateReplaceButton()
 }
@@ -570,16 +571,25 @@ func isMatchSelected( ) bool {
     return false
 }
 
+func showNoMatch( l int ) {
+    if len(pattern) > 0 {
+        showHighlights( -1, l, 0 )
+    } else {
+        removeHighlights()
+    }
+}
+
 func selectNewMatch( next bool ) {
     l := len(matches)
     if l > 0 {
         mi := getMatchIndex( next )
         if mi >= 0 && mi < l {
             searchPos = matches[mi]
+
             showHighlights( mi, l, searchPos )
         }
     } else {
-        showHighlights( -1, l, 0 )
+        showNoMatch( 0 )
     }
 }
 
@@ -593,7 +603,7 @@ func selectFirstMatch( ) {
             return
         }
     }
-    showHighlights( -1, l, 0 )
+    showNoMatch( l )
 }
 
 func (pc *pageContext) findPattern( ) {

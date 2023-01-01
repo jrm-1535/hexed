@@ -3,7 +3,7 @@ package main
 import (
     "log"
     "fmt"
-//    "strings"
+    "strings"
 //    "os"
     "path/filepath"
 	"github.com/gotk3/gotk3/gtk"
@@ -391,6 +391,26 @@ func newWorkArea( ) (*workArea, error) {
 
     wa := new( workArea )
     wa.notebook = ntbk  // no pages yet
+
+    target, err := gtk.TargetEntryNew( "text/uri-list", gtk.TARGET_OTHER_APP, 0 )
+    if err != nil {
+        log.Fatalf( "newWorkArea: cannot create \"text/uri-list\": %v\n", err )
+    }
+    wa.notebook.DragDestSet( gtk.DEST_DEFAULT_ALL,
+                             []gtk.TargetEntry{ *target },
+                             gdk.ACTION_COPY )
+
+    newFileURI := func ( w *gtk.Notebook, c *gdk.DragContext,
+                         x, y int, sd *gtk.SelectionData ) {
+        uri := string(sd.GetData())
+//        fmt.Printf( "Drag data received: %v\n", uri )
+        if strings.HasPrefix( uri, "file:///" ) {
+            uri = strings.TrimSuffix( uri, "\r\n" )
+            newPage( strings.TrimPrefix( uri, "file://"), false )
+        }
+    }
+    wa.notebook.Connect( "drag_data_received", newFileURI )
+
     return wa, nil
 }
 
@@ -544,9 +564,6 @@ func InitApplication( args *hexedArgs ) {
         log.Fatal( "Unable to create workarea: ", err )
     }
 
-//    fmt.Printf( "new work area: %p\n", workBench )
-    width, height := getPageDefaultSize( )
-
     // create status area
     statusArea := newStatusArea( )
 
@@ -558,13 +575,14 @@ func InitApplication( args *hexedArgs ) {
     windowBox.PackStart( menuBar, false, false, 0 )
     windowBox.PackStart( srArea, false, false, 0 )
     windowBox.PackStart( mainArea.getBin(), true, true, 1 )
-//    windowBox.PackEnd( p.sBar, false, false, 1 )
     windowBox.PackStart( statusArea, false, false, 0 )
 
     window.Add( windowBox )
 
     window.SetPosition(gtk.WIN_POS_MOUSE)
     window.SetResizable( true )
+
+    width, height := getPageDefaultSize( )
     window.SetDefaultSize(width, height)
 
     windowFocus = true
