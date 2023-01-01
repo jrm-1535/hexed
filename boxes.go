@@ -398,7 +398,7 @@ func makeConstantLabel( text string, name string, cCtl *constCtl,
                 return copyContent( constant, event )
             }
             eb.Connect( "button_press_event", cc )
-            eb.SetTooltipText( "Right click to copy Value" )
+            eb.SetTooltipText( localizeText( tooltipCopyValue ) )
             return wrapInFrame( eb, "", cCtl.frame )
         }
         return wrapInFrame( constant, "", cCtl.frame )

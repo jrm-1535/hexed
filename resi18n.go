@@ -180,6 +180,20 @@ const (
     buttonReplace
     buttonReplaceAll
 
+    tooltipCloseFile
+
+    tooltipNext
+    tooltipPrevious
+
+    tooltipReplaceNext
+    tooltipReplaceAll
+
+    tooltipAscii
+
+    tooltipCloseSearch
+
+    tooltipCopyValue
+
     warningCloseFile
     gotoPrompt
     findPrompt
@@ -373,6 +387,20 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Replace",                                              // buttonReplace
     "Replace All",                                          // buttonReplaceAll
 
+    "Close file",                                           // tooltipCloseFile
+
+    "Go to next match",                                     // tooltipNext
+    "Go to previous match",                                 // tooltipPrevious
+
+    "Replace next match",                                   // tooltipReplaceNext
+    "Replace all matches",                                  // tooltipReplaceAll
+
+    "ASCII",                                                // tooltipAscii
+
+    "Close search",                                         // tooltipCloseSearch
+
+    "Right click to copy Value",                            // tooltipCopyValue
+
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
     "Enter hex string to find ",                             // findPrompt
@@ -552,6 +580,20 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Remplace",                                             // buttonReplace
     "Remplace tous",                                        // buttonReplaceAll
+
+    "Fermer le fichier",                                    // tooltipCLoseFile
+
+    "Aller à la correspondance suivante",                   // tooltipNext
+    "Aller à la correspondance précédente",                 // tooltipPrevious
+
+    "Remplacer la correspondance suivante",                 // tooltipReplaceNext
+    "Remplacer toutes les correspondances",                 // tooltipReplacePrevious
+
+    "ASCII",                                                // tooltipAscii
+
+    "Fermer la recherche",                                  // tooltipCloseSearch
+
+    "Cliquer à droite pour copier la valeur",               // tooltipCopyValue
 
     "Si vous fermez sans enregister, toutes les modifications seront perdues",  // warningCloseFile
     "Entrez l'adresse de l'octet en hexadecimal",           // gotoPrompt

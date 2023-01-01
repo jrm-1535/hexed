@@ -763,10 +763,12 @@ func getValueBox( exp *explore ) *boxDef {
                               constCtl{ VALUE_ALIGN, FLOAT_SIZE, true, true, true }, nil, 0 },
                 &contentDef { "", nil, "FLOAT64", float64Val,
                               constCtl{ VALUE_ALIGN, FLOAT_SIZE, true, true, true }, nil, 0 } } }
+
+    separator := headerDef { " ", 0, 0 }
     return &boxDef { 10, 10, true, valueTitle, VERTICAL, []interface{} {
                      &endianRow, &headerRow,
                      &int8Row, &int16Row, &int32Row, &int64Row,
-                     &floatHeader, &floatRow, &headerDef { " ", 0, 0 } } }
+                     &separator, &floatHeader, &floatRow, &separator } }
 }
 
 func getExploreDialogDef( exp *explore, bitOffset int ) *boxDef {

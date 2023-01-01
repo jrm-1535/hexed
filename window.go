@@ -276,7 +276,7 @@ func makeTab( pg *page ) *gtk.Box {
     }
     eb.Connect( "enter_notify_event", enter )
     eb.Connect( "leave_notify_event", leave )
-    eb.SetTooltipText( "Close file" )
+    eb.SetTooltipText( localizeText( tooltipCloseFile ) )
 
     eb.SetAboveChild( true )
     cls := func( eventbox *gtk.EventBox, event *gdk.Event ) bool {

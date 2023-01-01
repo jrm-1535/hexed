@@ -176,21 +176,21 @@ func newSearchReplaceArea( ) *gtk.Box {
                                  incrementalSearch )
 
     next.Connect( "clicked", findNext  )
-    next.SetTooltipText( "Go to next match" )
+    next.SetTooltipText( localizeText( tooltipNext ) )
     addToWindowShortcuts( next, "clicked", 'g', gdk.CONTROL_MASK )
 
     previous.Connect( "clicked", findPrevious  )
     addToWindowShortcuts( previous, "clicked", 'g',
                           gdk.CONTROL_MASK | gdk.SHIFT_MASK )
-    previous.SetTooltipText( "Go to previous match" )
+    previous.SetTooltipText( localizeText( tooltipPrevious ) )
 
     replaceOp, replaceBox, replaceList, replace, replaceAll =
                newOperationBox( replacePrompt, buttonReplace, buttonReplaceAll,
                                 updateReplaceTooltip )
     replace.Connect( "clicked", replaceMatch )
-    replace.SetTooltipText( "Replace current match" )
+    replace.SetTooltipText( localizeText( tooltipReplaceNext ) )
     replaceAll.Connect( "clicked", replaceAllMatches )
-    replaceAll.SetTooltipText( "Replace all matches" )
+    replaceAll.SetTooltipText( localizeText( tooltipReplaceAll ) )
 
     opb, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
     if err != nil {
@@ -321,7 +321,9 @@ func BytesFromHexString( l int, s string ) (res []byte) {
 
 func getAsciiMarkupFromData( data []byte ) string {
     var b strings.Builder
-    b.WriteString( `<span foreground="red" style="italic">ASCII</span> «` )
+    b.WriteString( `<span foreground="red" style="italic">` )
+    b.WriteString( localizeText( tooltipAscii ) )
+    b.WriteString( `</span> «` )
     l := len(data)
 fmt.Printf("getAsciiTextFromData: l=%d data=%v\n", l, data )
     for i := 0; i < l; i ++ {
