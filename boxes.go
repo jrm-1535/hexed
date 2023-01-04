@@ -1,8 +1,8 @@
 package main
 
 import (
-    "log"
     "fmt"
+    "log"
     "strconv"
 
 	"github.com/gotk3/gotk3/gtk"
@@ -97,7 +97,7 @@ type constCtl struct {   // for label or constant text value (if changed is nil)
 
 // header is a simple label with optional top & left padding
 type headerDef  struct {
-    label       string      //
+    label       string
     top, left   uint
 }
 
@@ -116,7 +116,7 @@ func noKey( ) bool {
 
 func addBoolContent( innerBox *gtk.Box, content *contentDef,
                      access map[string]interface{} ) {
-//    fmt.Printf( "got input type bool\n" )
+
     boolVal := content.initVal.(bool)
 
     input, err := gtk.CheckButtonNew( )
@@ -129,7 +129,6 @@ func addBoolContent( innerBox *gtk.Box, content *contentDef,
     } else {
         toggled := func( button *gtk.CheckButton ) {
             v := button.ToggleButton.GetActive()
-            //fmt.Printf("Notifying content changed: %s=%v\n", content.name, v )
             content.changed( content.name, v )
         }
         input.Connect( "toggled", toggled )
@@ -168,12 +167,11 @@ func decimalKey( entry *gtk.Entry, event *gdk.Event ) bool {
     case HOME_KEY, END_KEY, LEFT_KEY, RIGHT_KEY,
          INSERT_KEY, BACKSPACE_KEY, DELETE_KEY,
          ENTER_KEY, KEYPAD_ENTER_KEY:
-//        fmt.Printf("Got Special key %#x\n", key)
         return false
 
     default:
         state := ev.State() & 0x0f
-//        fmt.Printf("Got key %#x state=%#x *CTL=%#x SHIFT=%#x ALT=%#x\n",
+//        printDebug("decimalKey: key %#x state=%#x *CTL=%#x SHIFT=%#x ALT=%#x\n",
 //                    key, state, gdk.CONTROL_MASK, gdk.SHIFT_MASK, gdk.MOD1_MASK)
         if state & gdk.CONTROL_MASK != 0 {
             return false
@@ -187,7 +185,7 @@ func decimalKey( entry *gtk.Entry, event *gdk.Event ) bool {
 
 func addIntContent( innerBox *gtk.Box, content *contentDef,
                     access map[string]interface{} ) {
-//    fmt.Printf( "got input type int, min %d max %d\n", content.inputMin, content.inputMax )
+
     intVal := content.initVal.(int)
 
     if content.changed == nil {
@@ -208,7 +206,6 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
         if nil != err {
             log.Fatal("addIntContent: Could not create input button:", err)
         }
-//        input.SetNumeric(true)
         input.SetValue( float64(intVal) )
         input.Entry.Connect( "key-press-event", noKey )
         valueChanged := func( button *gtk.SpinButton ) {
@@ -253,7 +250,6 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
         if err != nil {
             log.Fatalf( "addIntContent: cannot create entry: %v\n", err )
         }
-//        input.SetInputPurpose( gtk.INPUT_PURPOSE_DIGITS )
         input.Connect( "key-press-event", decimalKey )
         input.SetText( fmt.Sprintf("%d", intVal ) )
 
@@ -346,10 +342,8 @@ func wrapInFrame( w gtk.IWidget, title string, visible bool ) (*gtk.Frame) {
 func copyContent( label *gtk.Label, event *gdk.Event ) bool {
     buttonEvent := gdk.EventButtonNewFromEvent( event )
     evButton := buttonEvent.Button()
-    fmt.Printf("Event button=%d\n", evButton)
 
     if evButton != gdk.BUTTON_PRIMARY {
-        fmt.Printf("Pressed mouse button %d\n", evButton )
         copy2Clipboard := func( ) {
             t, err := label.GetText()
             if err == nil {
@@ -408,7 +402,7 @@ func makeConstantLabel( text string, name string, cCtl *constCtl,
 
 func addTextContent( innerBox *gtk.Box, content *contentDef,
                      access map[string]interface{} ) {
-//    fmt.Printf( "got input type text, min %d max %d\n", content.inputMin, content.inputMax )
+
     textVal := content.initVal.(string)
 
     if content.changed == nil {
@@ -422,7 +416,6 @@ func addTextContent( innerBox *gtk.Box, content *contentDef,
         return
     }
     lenCtl, ok := content.valueCtl.(lengthCtl)
-//fmt.Printf( "valCtl type=%T, ok=%t\n", valCtl, ok )
     if nil == content.valueCtl || ok {  // accept nil valueClt as no restrictions
         input, err := gtk.EntryNew( )
         if nil != err {
@@ -533,7 +526,7 @@ func addContentToBox( box *gtk.Box, content *contentDef,
     case string:
         addTextContent( innerBox, content, access )
     default:
-        fmt.Printf( "addContentToBox: got something else %T\n", content.initVal )
+        printDebug( "addContentToBox: unsupported type %T\n", content.initVal )
         return
     }
     box.PackStart( innerBox, false, false, 0 )    // in parent box
@@ -579,7 +572,7 @@ func makeBox( def * boxDef, access map[string]interface{} ) *gtk.Frame {
         case *boxDef:
             addBoxToBox( box, item, access )
         default:
-            fmt.Printf( "makeBox: got something else %T\n", item )
+            printDebug( "makeBox: unsupported type %T\n", item )
         }
     }
     return wrapInFrame( box, def.title, def.frame )

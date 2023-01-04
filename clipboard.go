@@ -1,7 +1,7 @@
 package main
 
 import (
-    "fmt"
+    "log"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
 )
@@ -19,28 +19,24 @@ var clipBoard hexClipboard
 func showClipboard() {
     data, err := clipBoard.cb.WaitForText( )
     if err == nil {
-        fmt.Printf( "Clipboard: %s\n", data )
+        printDebug( "showClipboard: %s\n", data )
     } else {
-        fmt.Printf( "unable to get clipboard data\n" )
+        log.Fatalf( "unable to get clipboard data\n" )
     }
 }
 
 func ownerChanged( cb *gtk.Clipboard, event *gdk.Event ) {
-    fmt.Printf( "Clipboard changed\n")
-//    if clipBoard != cb {
-//        fmt.Printf("Not the hexed clipBoard!\n")
-//    }
+    printDebug( "Clipboard changed\n")
     showClipboard()
 }
 
-func initClipboard( ) (err error) {  // which clipboard?
+func initClipboard( ) {
+    var err error
     clipBoard.cb, err = gtk.ClipboardGet( gdk.SELECTION_CLIPBOARD /*SELECTION_PRIMARY*/ )
-    if err == nil {
-        clipBoard.cb.Connect( "owner-change", ownerChanged )
-    } else {
-        fmt.Printf( "Unable to get clipBoard: error %v\n", err )
+    if err != nil {
+        log.Fatalf( "Unable to get clipBoard: error %v\n", err )
     }
-    return
+    clipBoard.cb.Connect( "owner-change", ownerChanged )
 }
 
 // return whether data is available in the clipboard and if true, an interface
@@ -48,7 +44,7 @@ func initClipboard( ) (err error) {  // which clipboard?
 // data
 func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
     if clipBoard.cb == nil {
-        panic("Hexed clipboard not initialized\n")
+        log.Panicln("Hexed clipboard not initialized")
     }
     // TODO: when setWithOwner is available in gotk3, use WaitForContent and
     // binary data (application/octet-stream) as content target
@@ -59,7 +55,7 @@ func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
 
     l := len(clipBoard.data)    // in bytes
     if l < 2 || (l & 1) != 0 {
-        fmt.Printf("isClipboardAvailable returns false\n")
+        printDebug( "isClipboardAvailable: returns false (length %d)\n", l )
         return false, nil
     }
     clipBoard.index = 0
@@ -69,12 +65,13 @@ func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
 
 // set an extra byte for prepending and appending nibbles in case of pasting
 // at an odd nibble location. This must be done by the entity managing the
-// paste operation, and is only valid for that paste operation
+// paste operation, and is only valid for that paste operation (any call to
+// isClipboardDataAvailable will reset the extra byte).
 func (hcp *hexClipboard) setExtraNibbles( extra byte ) {
     hcp.extraByte = extra
     hcp.extraValid = true
-//fmt.Printf("clipboard setExtraNibbles: first nibble=%#2x, last nibble=%#2x\n",
-//           extra >> 4, extra & 0x0f)
+    printDebug( "setExtraNibbles: first nibble=%#2x, last nibble=%#2x\n",
+                extra >> 4, extra & 0x0f )
 }
 
 func (hcp *hexClipboard)size() ( n int64 ) {
@@ -149,7 +146,7 @@ func writeHexDigitsFromSlice( out []byte, data []byte ) {
 func setClipboardData( data []byte ) {
 // TODO: when available in gotk3, use setWithOwner instead of immediate copy here
     l := len( data )
-//fmt.Printf("setClipboardData: data len=%d\n", l)
+    printDebug( "setClipboardData: data len=%d\n", l )
     b := make( []byte, l * 2 )  // 2 char per data byte
     writeHexDigitsFromSlice( b, data )
     clipBoard.cb.SetText( string(b) )

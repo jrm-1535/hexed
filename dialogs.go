@@ -29,13 +29,12 @@ func openFileName( ) (name string) {
                     "_Cancel", gtk.RESPONSE_CANCEL,
                     "_Open", gtk.RESPONSE_ACCEPT )
 
-    if err == nil {
-        res := dialog.Run( )
-        if res == gtk.RESPONSE_ACCEPT {
-            name = dialog.GetFilename( )
-        }
-    } else {
-        fmt.Printf( "openFileName error: %v\n", err )
+    if err != nil {
+        log.Fatalf( "openFileName error: %v\n", err )
+    }
+    res := dialog.Run( )
+    if res == gtk.RESPONSE_ACCEPT {
+        name = dialog.GetFilename( )
     }
     dialog.Destroy()
     return
@@ -47,13 +46,12 @@ func saveFileName() (name string) {
                     "_Cancel", gtk.RESPONSE_CANCEL,
                     "_Save", gtk.RESPONSE_ACCEPT )
 
-    if err == nil {
-        res := dialog.Run( )
-        if res == gtk.RESPONSE_ACCEPT {
-            name = dialog.GetFilename( )
-        }
-    } else {
-        fmt.Printf( "saveFileName error: %v\n", err )
+    if err != nil {
+        log.Fatalf( "saveFileName error: %v\n", err )
+    }
+    res := dialog.Run( )
+    if res == gtk.RESPONSE_ACCEPT {
+        name = dialog.GetFilename( )
     }
     dialog.Destroy()
     return
@@ -99,6 +97,7 @@ func closeFileDialog( ) (op int) {
 }
 // ---- goto dialog
 
+// TODO: see if decimalKey and hexFilter can be combined into a single keyFilter
 func hexFilter( entry *gtk.Entry, event *gdk.Event ) bool {
     ev := gdk.EventKeyNewFromEvent(event)
     key := ev.KeyVal()
@@ -466,7 +465,6 @@ func getBitStreamCtlBox( exp *explore, firstBit int ) *boxDef {
 
     bitOrderChanged := func( name string, val interface{} ) {
         bitOrderName := val.(string)
-fmt.Printf("Setting bit order to %s\b", bitOrderName)
         if bitOrderName == bitOrderNames[0] {
             exp.msbFirst = true
         } else {
@@ -543,61 +541,62 @@ const (
 func (exp *explore)getExploreIntValue( size, format int ) string {
     formatString := [...]string{ "%d", "%d", "%x", "%o" }
     bitLen := len(exp.data) << 3
-    if size > bitLen {
-        return ""
+    if size <= bitLen {
+        switch size {
+        case 8:
+            if SIGNED_DECIMAL_FORMAT == format {
+                return fmt.Sprintf( formatString[format], int8(exp.data[0]) )
+            }
+            return fmt.Sprintf( formatString[format], exp.data[0] )
+        case 16:
+            v := exp.endian.Uint16( exp.data[0:] )
+            if SIGNED_DECIMAL_FORMAT == format {
+                return fmt.Sprintf( formatString[format], int16(v) )
+            }
+            return fmt.Sprintf( formatString[format], v )
+        case 32:
+            v := exp.endian.Uint32( exp.data[0:] )
+            if SIGNED_DECIMAL_FORMAT == format {
+                return fmt.Sprintf( formatString[format], int32(v) )
+            }
+            return fmt.Sprintf( formatString[format], v )
+        case 64:
+            v := exp.endian.Uint64( exp.data[0:] )
+            if SIGNED_DECIMAL_FORMAT == format {
+                return fmt.Sprintf( formatString[format], int64(v) )
+            }
+            return fmt.Sprintf( formatString[format], v )
+        default:
+            log.Panicf( "getExploreIntValue: unsupported int size %d\n", size )
+        }
     }
-    switch size {
-    case 8:
-        if SIGNED_DECIMAL_FORMAT == format {
-            return fmt.Sprintf( formatString[format], int8(exp.data[0]) )
-        }
-        return fmt.Sprintf( formatString[format], exp.data[0] )
-    case 16:
-        v := exp.endian.Uint16( exp.data[0:] )
-        if SIGNED_DECIMAL_FORMAT == format {
-            return fmt.Sprintf( formatString[format], int16(v) )
-        }
-        return fmt.Sprintf( formatString[format], v )
-    case 32:
-        v := exp.endian.Uint32( exp.data[0:] )
-        if SIGNED_DECIMAL_FORMAT == format {
-            return fmt.Sprintf( formatString[format], int32(v) )
-        }
-        return fmt.Sprintf( formatString[format], v )
-    case 64:
-        v := exp.endian.Uint64( exp.data[0:] )
-        if SIGNED_DECIMAL_FORMAT == format {
-            return fmt.Sprintf( formatString[format], int64(v) )
-        }
-        return fmt.Sprintf( formatString[format], v )
-    }
-    panic("Unknown int size\n")
+    return ""
 }
 
 func (exp *explore)getExploreFloatValue( size int ) string {
     bitLen := len(exp.data) << 3
-    if size > bitLen {
-        return ""
-    }
-    buf := bytes.NewReader( exp.data )
-    switch size {
-    case 32:
-        var v float32
-        err := binary.Read( buf, exp.endian, &v )
-        if err != nil {
-            log.Fatal( "getExploreFloatValue: failed to read float32:", err )
+    if size <= bitLen {
+        buf := bytes.NewReader( exp.data )
+        switch size {
+        case 32:
+            var v float32
+            err := binary.Read( buf, exp.endian, &v )
+            if err != nil {
+                log.Fatal( "getExploreFloatValue: failed to read float32:", err )
+            }
+            return fmt.Sprintf( "%g", v )
+        case 64:
+            var v float64
+            err := binary.Read( buf, exp.endian, &v )
+            if err != nil {
+                log.Fatal( "getExploreFloatValue: failed to read float64:", err )
+            }
+            return fmt.Sprintf( "%g", v )
+        default:
+            log.Panicf( "getExploreIntValue: unsupported float size %d\n", size )
         }
-        return fmt.Sprintf( "%g", v )
-
-    case 64:
-        var v float64
-        err := binary.Read( buf, exp.endian, &v )
-        if err != nil {
-            log.Fatal( "getExploreFloatValue: failed to read float64:", err )
-        }
-        return fmt.Sprintf( "%g", v )
     }
-    panic("Unknown float size\n")
+    return ""
 }
 
 func (exp *explore) updateValuesWithEndianness( ) {
@@ -625,7 +624,6 @@ func getEndianessDef( exp *explore ) *contentDef {
     endiannesChanged := func( name string, val interface{} ) {
         pref := preferences{}
         endianName := val.(string)
-fmt.Printf("Setting endianess to %s\b", endianName)
         if endianName == endianNames[0] {
             exp.endian = binary.BigEndian
             pref[name] = true
@@ -734,7 +732,6 @@ func getValueBox( exp *explore ) *boxDef {
     int64Vals := make( []string, N_FORMATS )
     for i:= SIGNED_DECIMAL_FORMAT; i < N_FORMATS; i++ {
         int64Vals[i] = exp.getExploreIntValue( 64, i )
-        fmt.Printf( "int64Vals[%d]=%s\n", i, int64Vals[i] )
     }
 
     int64Row := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
@@ -795,7 +792,7 @@ func showExploreDialog( data []byte, bitOffset int ) {
     exp.dataBox = makeDataBox( def )
 
     for k, v := range exp.dataBox.access {
-        fmt.Printf( "explore DataBox: k=%s => %T value\n", k, v )
+        printDebug( "explore DataBox: k=%s => %T value\n", k, v )
     }
 
     exp.dialog.Add( exp.dataBox.Frame )

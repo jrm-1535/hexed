@@ -1,8 +1,6 @@
 package main
 
 import (
-    "fmt"
-
 //	"github.com/gotk3/gotk3/gtk"
 //	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/cairo"
@@ -44,7 +42,7 @@ func getCharExtent( face string, size float64,
     cr.SelectFontFace( face, slant, weight )
     cr.SetFontSize( size )
     extents := cr.FontExtents( )
-    fmt.Printf( "Image surface extents: ascent %f, descent %f, height %f" +
+    printDebug( "getCharExtent: ascent %f, descent %f, height %f" +
                 ", max_x_advance %f, max_y_advance %f\n",
                 extents.Ascent, extents.Descent, extents.Height,
                 extents.MaxXAdvance, extents.MaxYAdvance )

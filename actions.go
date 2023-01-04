@@ -1,8 +1,7 @@
 package main
 
 import (
-    "fmt"
-//    "strings"
+    "log"
 	"github.com/gotk3/gotk3/gtk"
 )
 
@@ -14,8 +13,8 @@ func getActionByName( name string ) func() {
 
 func act( name string ) {
     f := actions[name]
-    fmt.Printf( "act: %s => %v\n", name, f )
     if f != nil {
+        log.Printf( "act: executing action %s\n", name )
         f()
     }
 }
@@ -36,7 +35,7 @@ func initActions( nItems int ) {
     actions["open"] = func( ) {
         fileName := openFileName( )
         if fileName != "" {
-            fmt.Printf( "Open File %s\n", fileName )
+            printDebug( "Action: Open File %s\n", fileName )
             newPage( fileName, false )
         }
     }
@@ -67,7 +66,7 @@ func initActions( nItems int ) {
     actions["preferences"] = showPreferencesDialog
 
     languageAction := func( ) {
-        fmt.Printf( "language called\n" )
+        printDebug( "Action: language called\n" )
         selectLanguage( englishUSA )
         refreshMenus()
     }
@@ -77,8 +76,8 @@ func initActions( nItems int ) {
     actions["replace"] = searchReplace
 
     gotoAction := func( ) {
-        fmt.Printf( "goto called\n" )
         op, pos := gotoDialog()
+        printDebug( "Action: goto called for position %d\n", pos )
         if op == DO && pos >= 0 {
             gotoPos( pos )
         }
@@ -86,12 +85,12 @@ func initActions( nItems int ) {
     actions["goto"] = gotoAction
 
     helpAction := func ( ) {
-        fmt.Printf( "help content called\n" )
+        printDebug( "Action: help content called\n" )
     }
     actions["contents"] = helpAction
 
     aboutAction := func( ) {
-        fmt.Printf( "help about called\n" )
+        printDebug( "Action: help about called\n" )
 //        aboutDialog( )
 //        refreshMenus()
     }

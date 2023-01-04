@@ -612,13 +612,13 @@ var currentLanguageId  int = 0
 
 func selectLanguage( languageId int ) {
     if languageId >= languageNumber {
-        log.Fatalf( "SelectLanguage: language index out of range: %d (range 0-%d)\n", languageId, languageNumber-1 )
+        log.Fatalf( "SelectLanguage: language index out of range: %d (range 0-%d)\n",
+                    languageId, languageNumber-1 )
     }
     if currentLanguageId != languageId {
-        log.Printf( "SelectLanguage: change from %s to %s\n", languages[currentLanguageId], languages[languageId] )
+        log.Printf( "SelectLanguage: change from %s to %s\n",
+                    languages[currentLanguageId], languages[languageId] )
         currentLanguageId = languageId
-        // refresh all views since they display text and dates in the new language
-//        TriggerNotification( &[]int {CHANNEL, VIDEO, DOWNLOAD, TRASH, HISTORY} )
     }
 }
 
@@ -633,7 +633,8 @@ func getSupportedLanguages( ) *[]string {
 
 func localizeText( textId int ) string {
     if textId >= arrayLength {
-        log.Fatalf( "localizeText: resource index out of range: %d (range 0-%d)\n", textId, arrayLength-1 )
+        log.Fatalf( "localizeText: resource index out of range: %d (range 0-%d)\n",
+                    textId, arrayLength-1 )
     }
     return textResources[currentLanguageId][textId]
 }
@@ -642,7 +643,8 @@ func localizeDate( iso8601 string ) string {
     // internal format is iso8601
     t, err := time.Parse( "2006-01-02T15:04:05Z", iso8601 )
     if err != nil {
-        log.Fatalf( "Unable to localize date: %v\n", err )
+        log.Fatalf( "localizeDate: Unable get iso8601 date %s: %v\n",
+                    iso8601, err )
     }
     lt := t.Local()
     return lt.Format( textResources[currentLanguageId][dateFormat] )

@@ -32,6 +32,7 @@ var (
     windowFocus     bool                    // true if main window has focus
     pageHasFocus    bool                    // true if page has focus
                                             // within main window
+    hexedDebug      bool
 )
 
 type workArea struct {                      // workArea is
@@ -44,17 +45,29 @@ type page struct {                          // a page is made of
     context *pageContext                    // page context
     path    string                          // page file path
 }
-/*
-func printPagePaths( ) {
-    for _, pg := range mainArea.pages {
-        fmt.Printf(" path %s\n", pg.path)
+
+func printDebug( format string, args ...interface{} ) {
+    if hexedDebug {
+        msg := fmt.Sprintf( format, args... )
+        err := log.Output( 2, msg )
+        if err != nil {
+            log.Panicf( "printDebug: can't output log %s\n", msg )
+        }
     }
 }
-*/
-func reorderPages( to, from int ) int {
-//    fmt.Printf( "Before move:\n" )
-//    printPagePaths()
 
+func printPagePaths( header string ) {
+    if hexedDebug {
+        printDebug( header )
+        for _, pg := range mainArea.pages {
+            printDebug(" path %s\n", pg.path)
+        }
+    }
+}
+
+func reorderPages( to, from int ) int {
+
+    printPagePaths( "reorderPages: before move\n" )
     fromPage := mainArea.pages[from]
     if from > to {
         copy( mainArea.pages[to+1:from+1], mainArea.pages[to:from] )
@@ -63,10 +76,16 @@ func reorderPages( to, from int ) int {
         copy( mainArea.pages[from:to], mainArea.pages[from+1:to+1] )
         mainArea.pages[to] = fromPage
     }
-//    fmt.Printf( "page %d moved to %d\n", from, to )
-//    fmt.Printf( "After move:\n" )
-//    printPagePaths()
+    printPagePaths( "reorderPages: after move\n" )
+    log.Printf( "reorderPages: page %d moved to %d\n", from, to )
     return to
+}
+
+func getWorkAreaPage( pageNumber int ) *page {
+    if pageNumber >= len(mainArea.pages) {
+        log.Panicln("Notebook page number out of range")
+    }
+    return mainArea.pages[pageNumber]
 }
 
 func getCurrentWorkAreaPage( ) *page {
@@ -74,10 +93,7 @@ func getCurrentWorkAreaPage( ) *page {
     if -1 == pageNumber {
         return nil
     }
-    if pageNumber >= len(mainArea.pages) {
-        panic("Notebook page number out of range\n")
-    }
-    return mainArea.pages[pageNumber]
+    return getWorkAreaPage( pageNumber )
 }
 
 func getCurrentWorkAreaPageContext( ) *pageContext {
@@ -91,7 +107,7 @@ func getCurrentWorkAreaPageContext( ) *pageContext {
 func saveCurrentPage( ) {
     pg := getCurrentWorkAreaPage( )
     if pg == nil {
-        panic("No notebook page available\n")
+        log.Panicln("No notebook page available")
     }
     if pg.path == "" {
         saveCurrentPageAs( )
@@ -103,7 +119,7 @@ func saveCurrentPage( ) {
 func saveCurrentPageAs( ) {
     pathName := saveFileName( )
     if pathName != "" {
-        fmt.Printf( "Save File as %s\n", pathName )
+        log.Printf( "saveCurrentPageAs: file %s\n", pathName )
         err := savePageContentAs( pathName )
         if err != nil {
             errorDisplay( "Unable to save file %s (%v)", pathName, err )
@@ -120,7 +136,7 @@ func saveCurrentPageAs( ) {
 func revertCurrentPage( ) {
     pg := getCurrentWorkAreaPage( )
     if pg == nil {
-        panic("No notebook page available\n")
+        log.Panicln("No notebook page available")
     }
     if pg.path != "" {
         reloadPageContent( pg.path )
@@ -132,8 +148,10 @@ func removeCurrentPage( ) {
     mainArea.removePage( pageNumber )
 }
 
+//func closePage( pg int )
 func closeCurrentPage( ) {
     pc := getCurrentWorkAreaPageContext( )
+
     if pc != nil && pc.isPageModified() {
         switch closeFileDialog() {
         case CANCEL:
@@ -198,7 +216,6 @@ func showPosition( pos string ) {
 }
 
 func showInputMode( readOnly, replace bool ) {
-fmt.Printf("showInputMode: readOnly=%t replace=%t\n", readOnly, replace)
     var text string
     if readOnly {
         text = localizeText(textNoInputMode)
@@ -244,10 +261,10 @@ func (wa *workArea)removePage( pageIndex int ) {
 }
 
 func closeTab( pg *page ) bool {
-//    fmt.Printf( "Closing Tab for page %s\n", pg.label.GetLabel() )
     for i, p := range mainArea.pages {
         if pg == p {
-//            fmt.Printf( ">> Page number %d (path <%s>)\n", i, p.path )
+            log.Printf( "CloseTab: Page number %d (label %s, path <%s>)\n",
+                        i, pg.label.GetLabel(), p.path )
             mainArea.removePage(i)
             break
         }
@@ -349,30 +366,27 @@ func newPage( pathName string, readOnly bool ) {
     if label, err = gtk.LabelNew( name ); nil != err {
         log.Fatalf("newPage unable to create label %s: %v", name, err)
     }
-
     index := mainArea.appendPage( widget, label, context, pathName )
     // make sure appendPage is called before activating pageContent
     context.activate( )
-
     showWindow()
-
     mainArea.selectPage( index )
 
     pageExists( true )
     fileExists( pathName != "" )
 }
 
-func newWorkArea( ) (*workArea, error) {
+func newWorkArea( ) *workArea {
     ntbk, err := gtk.NotebookNew()
     if err != nil {
-        return nil, err
+        log.Fatalf( "newWorkArea: cannot create notebook: %v\n", err )
     }
     ntbk.SetTabPos( gtk.POS_TOP)
 
     var pageNumber int
     switchPage := func( nb *gtk.Notebook,
                         child *gtk.Widget, num uint ) bool {
-//        fmt.Printf("changePage: page index %d\n", num)
+        log.Printf("changePage: page index %d\n", num)
         pageNumber = int(num)
         if pageNumber < len(mainArea.pages) {
             page := mainArea.pages[ pageNumber ]
@@ -403,21 +417,20 @@ func newWorkArea( ) (*workArea, error) {
     newFileURI := func ( w *gtk.Notebook, c *gdk.DragContext,
                          x, y int, sd *gtk.SelectionData ) {
         uri := string(sd.GetData())
-//        fmt.Printf( "Drag data received: %v\n", uri )
+        log.Printf( "Drag data received: %v\n", uri )
         if strings.HasPrefix( uri, "file:///" ) {
             uri = strings.TrimSuffix( uri, "\r\n" )
             newPage( strings.TrimPrefix( uri, "file://"), false )
         }
     }
     wa.notebook.Connect( "drag_data_received", newFileURI )
-
-    return wa, nil
+    return wa
 }
 
 func newStatusBar( ) {
     sb, err := gtk.StatusbarNew()
     if err != nil {
-        log.Fatalf( "Unable to create status bar: %v\n", err )
+        log.Fatalf( "newStatusBar: Unable to create status bar: %v\n", err )
     }
     statusBar = sb
     menuHintId = sb.GetContextId( "menuHint" )
@@ -425,28 +438,25 @@ func newStatusBar( ) {
 }
 
 func newPositionLabel( ) {
-
     pl, err := gtk.LabelNew( "      " )
     if err != nil {
-        log.Fatalf( "Unable to create position label: %v\n", err )
+        log.Fatalf( "newPositionLabel: Unable to create position label: %v\n", err )
     }
     positionLabel = pl
 }
 
 func newEditLabel( ) {
-
     el, err := gtk.LabelNew( "    " )
     if err != nil {
-        log.Fatalf( "Unable to create readOnly/readWrite label: %v\n", err )
+        log.Fatalf( "newEditLabel: Unable to create readOnly/readWrite label: %v\n", err )
     }
     editLabel = el
 }
 
 func newInputModeLabel( ) {
-
     iml, err := gtk.LabelNew( "    " )
     if err != nil {
-        log.Fatalf( "Unable to create position label: %v\n", err )
+        log.Fatalf( "newInputModeLabel: Unable to create position label: %v\n", err )
     }
     inputModeLabel = iml
 }
@@ -458,7 +468,7 @@ func newInputModeLabel( ) {
 func newStatusArea( ) *gtk.Box {
     sa, err := gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
     if err != nil {
-        log.Fatalf( "Unable to create the status area: %v\n", err )
+        log.Fatalf( "newStatusArea: Unable to create the status area: %v\n", err )
     }
     newStatusBar( )
     newPositionLabel( )
@@ -478,18 +488,18 @@ func exitApplication( win *gtk.Window ) bool {
     return false
 }
 
-// called when mouse button on page
+// called when mouse button clicked on page
 func requestPageFocus( ) {
-fmt.Printf( "requestPageFocus: previous focus state: window=%t page=%t\n",
-            windowFocus,  pageHasFocus )
+    printDebug( "requestPageFocus: previous focus state: window=%t page=%t\n",
+                windowFocus,  pageHasFocus )
     searchGiveFocus( )  // remove any visible selection
     pageGrabFocus()
     pageHasFocus = true
 }
 
 func requestSearchFocus( ) {
-fmt.Printf( "requestSearch Focus: previous focus state: window=%t page=%t\n",
-            windowFocus,  pageHasFocus )
+    printDebug( "requestSearchFocus: previous focus state: window=%t page=%t\n",
+                windowFocus,  pageHasFocus )
     if windowFocus {
         pageGiveFocus( )
     }
@@ -497,8 +507,8 @@ fmt.Printf( "requestSearch Focus: previous focus state: window=%t page=%t\n",
 }
 
 func releaseSearchFocus( ) {
-fmt.Printf("releaseSearch Focus\n")
-fmt.Printf("previous focus state: window=%t page=%t\n", windowFocus,  pageHasFocus )
+    printDebug( "releaseSearchFocus: previous focus state: window=%t page=%t\n",
+                windowFocus,  pageHasFocus )
     if windowFocus {
         pageGrabFocus()
     }
@@ -506,8 +516,8 @@ fmt.Printf("previous focus state: window=%t page=%t\n", windowFocus,  pageHasFoc
 }
 
 func windowGotFocus( w *gtk.Window, event *gdk.Event ) bool {
-fmt.Printf( "Main window Got focus! previous focus state: window=%t page=%t\n",
-            windowFocus,  pageHasFocus )
+    printDebug( "windowGotFocus: previous focus state: window=%t page=%t\n",
+                windowFocus,  pageHasFocus )
     windowFocus = true
     if pageHasFocus {
         pageGrabFocus( )    // hide caret and disable menus
@@ -518,8 +528,8 @@ fmt.Printf( "Main window Got focus! previous focus state: window=%t page=%t\n",
 }
 
 func windowLostFocus( w *gtk.Window, event *gdk.Event ) bool {
-fmt.Printf( "Main window lost focus! previous focus state: window=%t page=%t\n",
-            windowFocus,  pageHasFocus )
+    printDebug( "windowLostFocus: previous focus state: window=%t page=%t\n",
+                windowFocus,  pageHasFocus )
     windowFocus = false
     if pageHasFocus {
         pageGiveFocus( )    // show caret and enable menus
@@ -536,6 +546,7 @@ func InitApplication( args *hexedArgs ) {
         log.Fatal( "Unable to create window:", err )
     }
 */
+    hexedDebug = args.debug
 
     initPreferences()
     initFontContext()
@@ -543,28 +554,16 @@ func InitApplication( args *hexedArgs ) {
 
     var err error
     window, err = gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
-    if err != nil {
-        log.Fatal( "Unable to create nain window: ", err )
-    }
-    if window == nil {
-        panic( "Main window does not exist\n")
+    if err != nil || window == nil {
+        log.Fatal( "Unable to create main window: ", err )
     }
 
     window.Connect( "delete_event", exitApplication )
     window.SetTitle("hexed")
 
-    // create menus
     menuBar := buildMenus( )
-
-    // create Search/Replace area
     srArea := newSearchReplaceArea( )
-
-    mainArea, err = newWorkArea( )
-    if err != nil {
-        log.Fatal( "Unable to create workarea: ", err )
-    }
-
-    // create status area
+    mainArea = newWorkArea( )
     statusArea := newStatusArea( )
 
     // Assemble the window
@@ -592,13 +591,10 @@ func InitApplication( args *hexedArgs ) {
     showWindow()
 
     initTheme()
+    initClipboard( )
 
-    err = initClipboard( )
-    if err != nil {
-        fmt.Printf("clipBoard error: %v\n", err )
-    }
-    if args != nil {
-        newPage( args.filePath, args.readOnly )
+    for _, fp := range args.filePaths {
+        newPage( fp, args.readOnly )
     }
     gtk.Main()
 }

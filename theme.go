@@ -27,9 +27,9 @@ const THEME_DIRECTORY = "/usr/share/gtksourceview-3.0/styles/"
 var hexedHome   string
 func setHexedHome( ) {
     home := os.Getenv( "HOME" )
-    fmt.Printf("Home is \"%s\"\n", home)
+    printDebug( "Home is \"%s\"\n", home )
     if home == "" {
-        panic( "Unable to get $HOME\n" )
+        log.Panicln( "Unable to get $HOME" )
     }
     hexedHome = filepath.Join( home, HEXED_HOME )
 }
@@ -41,12 +41,12 @@ func appendAvailableThemes( path string, paths *[]string ) (err error) {
         return
     }
 
-    fmt.Printf( "Themes:\n" )
+    printDebug( "Themes:\n" )
     for _, file := range files {
         if ! file.IsDir() {
             name := file.Name()
             if strings.HasSuffix( name, ".xml" ) {
-                fmt.Printf( " %s\n", name )
+                printDebug( " %s\n", name )
                 *paths = append( *paths, filepath.Join( path, name ) )
             }
         }
@@ -58,7 +58,7 @@ func appendHomeThemes( paths *[]string ) (err error) {
 
     home := hexedHome
     if home == "" {
-        panic("Hexed Home not set\n")
+        log.Panicln("Hexed Home not set")
     }
 
     var files []os.DirEntry
@@ -237,7 +237,7 @@ const (
 */
 
 type choice struct {
-    index, priority int    // -1, -1 if not used
+    index, priority int    // (-1, -1) if not used
 }
 
 type alternate struct {
@@ -250,9 +250,9 @@ var keyMapping = [...]alternate{
     { "address",                choice{ ADDR_AREA_FOREGROUND, 3 },
                                 choice{ ADDR_AREA_BACKGROUND, 3 } },
     { "hexadecimal",            choice{ HEXA_AREA_FOREGROUND, 3 },
-                                choice{ HEXA_AREA_FOREGROUND, 3 } },
+                                choice{ HEXA_AREA_BACKGROUND, 3 } },
     { "ascii",                  choice{ ASCI_AREA_FOREGROUND, 3 },
-                                choice{ ASCI_AREA_FOREGROUND, 3 } },
+                                choice{ ASCI_AREA_BACKGROUND, 3 } },
 
     { "current-match",          choice{ -1, -1 },
                                 choice{ CURRENT_MATCH_BACKGROUND, 3 } },
@@ -303,7 +303,6 @@ func getAlternateMapping( n string ) *alternate {
     // hexed mapping has priority
     for i := 0; i < len(keyMapping); i++ {
         if keyMapping[i].name == n {
-//fmt.Printf("Found alternate %d (%s)\n", i, n)
             return &keyMapping[i]
         }
     }
@@ -328,11 +327,11 @@ const (
 
 func (t *theme) setPattern( index int, priority int, col uint32 ) {
     if index < 0 || index >= N_PATTERNS {
-        panic("Invalid pattern index\n")
+        log.Panicln("Invalid pattern index")
     }
 
-//fmt.Printf( " set uint32 col=%#08x, b=%#02x, g=%#x, r=%#02x @index %d, priority %d\n",
-//            col, byte( col ), byte( col >> 8 ), byte( col >> 16 ), index, priority )
+    printDebug( "setPattern: col=%#08x, r=%#02x, g=%#x, b=%#02x @index %d, priority %d\n",
+                col, byte( col >> 16 ), byte( col >> 8 ), byte( col ), index, priority )
     if t.colorPatterns[index][colP] < byte(priority) {
         t.colorPatterns[index][colB] = byte( col )
         t.colorPatterns[index][colG] = byte( col >> 8 )
@@ -348,7 +347,6 @@ func makeUint32( s string ) (uint32, error) {
     v, err := strconv.ParseUint( s[1:], 16, 32 )
     if err != nil {
         // not a number, may be a well-known color name
-//fmt.Printf("makeUint32: not a number : #%s\n", s[1:])
         if s[1:] == "black" {
             v = 0
         } else if s[1:] == "white" {
@@ -357,7 +355,6 @@ func makeUint32( s string ) (uint32, error) {
             return 0, fmt.Errorf( "Not a valid color definition (%s)\n", s )
         }
     }
-//fmt.Printf( " makeUint32: string=\"%s\" val=%#08x\n", s, v )
     return uint32(v), nil
 }
 
@@ -553,7 +550,7 @@ func isContrastSufficient( col1, col2 *[4]byte ) bool {
     if contrast < 1.0 {
         contrast = 1.0 / contrast
     }
-fmt.Printf("Contrast = %f\n", contrast )
+    printDebug("isContrastSufficient: Contrast = %f\n", contrast )
     return contrast >= 2.0
 }
 
@@ -579,70 +576,70 @@ fmt.Printf("Contrast = %f\n", contrast )
 func (t *theme) fixColorPatterns( ) {
     if ! isContrastSufficient( &t.colorPatterns[ADDR_AREA_FOREGROUND],
                                  &t.colorPatterns[ADDR_AREA_BACKGROUND] ) {
-//fmt.Printf(" ADDR insufficient contrast between F & B, setting ADDR F= ~ADDR B\n")
+        printDebug(" ADDR insufficient contrast between F & B, setting ADDR F= ~ADDR B\n")
         setOppositeRGB( &t.colorPatterns[ADDR_AREA_FOREGROUND],
                             &t.colorPatterns[ADDR_AREA_BACKGROUND] )
     }
     if t.colorPatterns[HEXA_AREA_BACKGROUND][colP] == 0 {
-//fmt.Printf(" HEXA undefined B, setting HEXA B= ADDR B\n")
+        printDebug(" HEXA undefined B, setting HEXA B= ADDR B\n")
         t.colorPatterns[HEXA_AREA_BACKGROUND] =
                                 t.colorPatterns[ADDR_AREA_BACKGROUND]
     }
     if ! isContrastSufficient( &t.colorPatterns[HEXA_AREA_FOREGROUND],
                                  &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
-//fmt.Printf(" HEXA insufficient contrast between F & B, checking ADDR F contrast\n")
+        printDebug(" HEXA insufficient contrast between F & B, checking ADDR F contrast\n")
         if isContrastSufficient( &t.colorPatterns[ADDR_AREA_FOREGROUND],
                                    &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
-//fmt.Printf(" >> sufficient contrast between ADDR F & HEXA B, setting HEXA F= ADDR F\n")
+            printDebug(" >> sufficient contrast between ADDR F & HEXA B, setting HEXA F= ADDR F\n")
             t.colorPatterns[HEXA_AREA_FOREGROUND] =
                                 t.colorPatterns[ADDR_AREA_FOREGROUND]
         } else  {
-//fmt.Printf(" >> INsufficient contrast between ADDR F & HEXA B, setting HEXA F=~HEXA B\n")
+            printDebug(" >> INsufficient contrast between ADDR F & HEXA B, setting HEXA F=~HEXA B\n")
             setOppositeRGB( &t.colorPatterns[HEXA_AREA_FOREGROUND],
                                 &t.colorPatterns[HEXA_AREA_BACKGROUND] )
         }
     }
     if t.colorPatterns[ASCI_AREA_BACKGROUND][colP] == 0 {
-//fmt.Printf(" ASCI undefined B, setting ASCI B= HEXA B\n")
+        printDebug(" ASCI undefined B, setting ASCI B= HEXA B\n")
         t.colorPatterns[ASCI_AREA_BACKGROUND] =
                                 t.colorPatterns[HEXA_AREA_BACKGROUND]
     }
     if ! isContrastSufficient( &t.colorPatterns[ASCI_AREA_FOREGROUND],
                                 &t.colorPatterns[ASCI_AREA_BACKGROUND] ) {
-//fmt.Printf(" ASCI insufficient contrast between F & B, checking HEXA F contrast\n")
+        printDebug(" ASCI insufficient contrast between F & B, checking HEXA F contrast\n")
         if isContrastSufficient( &t.colorPatterns[ASCI_AREA_FOREGROUND],
                                   &t.colorPatterns[HEXA_AREA_FOREGROUND] ) {
-//fmt.Printf(" >> sufficient contrast between HEXA F & ASCI B, setting ASCI F= HEXA F\n")
+            printDebug(" >> sufficient contrast between HEXA F & ASCI B, setting ASCI F= HEXA F\n")
             t.colorPatterns[ASCI_AREA_FOREGROUND] =
                                 t.colorPatterns[HEXA_AREA_FOREGROUND]
         } else  {
-//fmt.Printf(" >> INsufficient contrast between HEXA F & ASCI B, setting ASCI F=~ASCI B\n")
+            printDebug(" >> INsufficient contrast between HEXA F & ASCI B, setting ASCI F=~ASCI B\n")
             setOppositeRGB( &t.colorPatterns[ASCI_AREA_FOREGROUND],
                                 &t.colorPatterns[ASCI_AREA_BACKGROUND] )
         }
     }
     if ! isContrastSufficient( &t.colorPatterns[SEPARATOR_FOREGROUND],
                                 &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
-//fmt.Printf(" insufficient contrast between SEPA F & HEXA B, setting SEPA F=HEXA F\n")
+        printDebug(" insufficient contrast between SEPA F & HEXA B, setting SEPA F=HEXA F\n")
         t.colorPatterns[SEPARATOR_FOREGROUND] =
                                 t.colorPatterns[HEXA_AREA_FOREGROUND]
     }
     if ! isContrastSufficient( &t.colorPatterns[CARET_FOREGROUND],
                                 &t.colorPatterns[HEXA_AREA_BACKGROUND] ) {
-//fmt.Printf(" insufficient contrast between CARET F & HEXA B, setting CARET F=~HEXA B\n")
+        printDebug(" insufficient contrast between CARET F & HEXA B, setting CARET F=~HEXA B\n")
         setOppositeRGB( &t.colorPatterns[CARET_FOREGROUND],
                                 &t.colorPatterns[HEXA_AREA_BACKGROUND] )
     }
 }
 
 func (t *theme) setThemePatterns( ) error {
-fmt.Printf("Setting Theme Color Patterns:\n")
+    printDebug("Setting Theme Color Patterns:\n")
     var err error
     for i := 0; i < N_PATTERNS; i++ {
         r := float64(t.colorPatterns[i][1]) / float64(255)
         g := float64(t.colorPatterns[i][2]) / float64(255)
         b := float64(t.colorPatterns[i][3]) / float64(255)
-fmt.Printf( "  pattern %d, cairo=(%f,%f,%f)\n", i, r, g, b )
+        printDebug( "  pattern %d, cairo=(%f,%f,%f)\n", i, r, g, b )
         cairoPatterns[i], err = cairo.NewPatternFromRGB( r, g, b )
         if err != nil {
             return err
@@ -676,7 +673,6 @@ func getThemeNames( ) (names []string, err error) {
 
     for _, path := range paths {
         name, err := getThemeName( path )
-        //fmt.Printf( "Adding name=%s err=%v @ %d\n", name, err, i )
         if err == nil {
             names = append( names, name )
         }   // else ignore files with errors
@@ -692,7 +688,7 @@ func getThemeName( path string ) (name string, err error) {
     if file, err = os.Open( path ); err != nil {
         return
     }
-//fmt.Printf( "Opened path=%s err=%v\n", path, err )
+
     var data []byte
     data, err = io.ReadAll( file )
 
@@ -701,7 +697,6 @@ func getThemeName( path string ) (name string, err error) {
     var tok interface{}
     for {
         tok, err = dec.Token()
-//fmt.Printf( "got token=%T err=%v\n", tok, err )
         if err != nil {
             return
         }

@@ -2,7 +2,6 @@ package main
 
 import (
     "log"
-    "fmt"
 
 	"github.com/gotk3/gotk3/gtk"
 //	"github.com/gotk3/gotk3/glib"
@@ -124,21 +123,22 @@ var (
 func locateMenuItemByActionName( aName string ) (mi *menuItem) {
     mi = menuItems[ aName ]
     if mi == nil {
-        panic( "Unable to locate menu Item by action name\n" )
+        log.Panicf( "Unable to locate menu Item for action %s\n", aName )
     }
     return
 }
 
 func addPopupMenuItem( aName string, textId int, fct func() ) {
     if _, ok := menuItems[aName]; ok {
-        panic( fmt.Sprintf("addPopupMenuItem: item already exists for action name <%s>\n", aName ) )
+        log.Panicf( "addPopupMenuItem: item already exists for action name <%s>\n",
+                    aName )
     }
     menuItems[ aName ] = &menuItem{ nil, aName, false, textId, 0, 0, 0 }
     addAction( aName, fct )
 }
 
 func delPopupMenuItem( aName string ) {
-//fmt.Printf("delPopupMenuItem: deleting action name <%s>\n", aName )
+    printDebug( "delPopupMenuItem: deleting menuItem & action name <%s>\n", aName )
     delete( menuItems, aName )
     delAction( aName )
 }
@@ -152,13 +152,15 @@ func popupContextMenu( aNames []string, event *gdk.Event ) {
     for _, aName := range aNames {
         mi := locateMenuItemByActionName( aName )
         textId := mi.getTextId()
-//fmt.Printf( "Adding menu item %s [action %s]\n", localizeText(textId), aName )
+        printDebug( "Adding menu item %s [action %s]\n",
+                    localizeText(textId), aName )
         menuItem, err := gtk.MenuItemNewWithLabel( localizeText(textId) )
         if err != nil {
             log.Fatal("Unable to create context menu item:", err)
         }
         menuItem.Show()
-//fmt.Printf( "connecting action %s (%p)\n", aName, getActionByName( aName) )
+        printDebug( "connecting action %s (%p)\n",
+                    aName, getActionByName( aName) )
         menuItem.Connect( "activate", getActionByName( aName) )
         popUpMenu.Append( menuItem )
     }
@@ -204,7 +206,7 @@ type menu struct {
 // refresh menus after language change
 func refreshMenus( ) {
     for mn := menuList; mn != nil; mn = mn.next {
-//        fmt.Printf( "menu: %v\n", mn )
+        printDebug( "refreshMenus: menu: %v\n", mn )
         mn.gtkMenu.SetLabel( localizeText( mn.textId ) )
         for _, mi := range mn.mItems {
             mi.gtkItem.SetLabel( localizeText( mi.getTextId() ) )
@@ -215,7 +217,7 @@ func refreshMenus( ) {
 // enable or disable individual menu item. The argument aName  uniquely
 // identifies the menu item across all menus. 
 func enableMenuItem( aName string, enable bool ) {
-//    fmt.Printf("Enabling menu item for %s action: %v\n", aName, enable )
+    printDebug("Enabling menu item for %s action: %v\n", aName, enable )
     mi := locateMenuItemByActionName( aName )
     mi.gtkItem.SetSensitive( enable )
 }
@@ -289,7 +291,7 @@ func addMenuItem( m *menu, itemDef *menuItemDef,
     actionName := itemDef.aName
     menuAction := func( ) {
         clearMenuHint()
-        fmt.Printf("action %s called\n", actionName)
+        printDebug( "action %s called\n", actionName )
         act( actionName )
     }
     gmi.Connect( "activate", menuAction )

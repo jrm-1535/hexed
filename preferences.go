@@ -1,7 +1,6 @@
 package main
 
 import (
-    "fmt"
     "log"
 
     "path/filepath"
@@ -152,10 +151,10 @@ var notifications map[string][]notifyChange = make(map[string][]notifyChange)
 
 func registerForChanges( name string, callback notifyChange ) {
     if callbacks, ok := notifications[name]; ok {
-        fmt.Printf( "Adding Notification for preference %s\n", name )
+        printDebug( "Adding Notification for preference %s\n", name )
         notifications[name] = append( callbacks, callback )
     } else {
-        fmt.Printf( "First Notification for preference %s\n", name )
+        printDebug( "First Notification for preference %s\n", name )
         notifications[name] = []notifyChange { callback }
     }
 }
@@ -164,11 +163,11 @@ func update( d preferences ) {
     updated := false
     for k, v := range d {
         if pref[k] != v {
-            fmt.Printf( "Updating preference: %s to %v\n", k, v )
+            printDebug( "Updating preference: %s to %v\n", k, v )
             pref[k] = v
 
             if callbacks, ok := notifications[k]; ok {
-                fmt.Printf( "Notifying updated preference: %s\n", k )
+                printDebug( "Notifying updated preference: %s\n", k )
                 for _, callback := range( callbacks ) {
                     callback( k )
                 }

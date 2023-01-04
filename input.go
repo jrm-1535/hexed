@@ -1,24 +1,10 @@
 package main
 
 import (
-//    "fmt"
-
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
 )
-/*
-type pendingOp int
-const (
-    NO_PENDING pendingOp = iota
-    PENDING_INSERT
-    PENDING_DEL
-    PENDING_BACKSPACE
-)
 
-func (pc *pageContext) getCaretPosition( ) int64 {
-    return pc.caretPos
-}
-*/
 const (
     NIBBLE = 1 + iota       // order is important: do not change
     LINE
@@ -767,7 +753,7 @@ func editAtCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
 // it takes 2 * nBytesLine to reach the end of a line
     keyEvent := gdk.EventKeyNewFromEvent(event)
     modifiers := keyEvent.State()
-//fmt.Printf("Key modifiers=%#04x\n", modifiers)
+//    printDebug( "Key modifiers=%#04x\n", modifiers )
     if modifiers & 0x0f != 0 {
         return false
     }
@@ -796,9 +782,12 @@ func editAtCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
 
     case INSERT_KEY:
         if ! pc.tempReadOnly {
-            // FIXME: treat switch from replace to insert as setting caret
-            //        to ensure proper state setting.
             pc.replaceMode = ! pc.replaceMode
+            if pc.caretPos & 1 == 0 { // ensure proper state setting for insert
+                pc.setEvenCaretNoPending()
+            } else {
+                pc.setOddCaretNoPending()
+            }
         }
         showInputMode( pc.tempReadOnly, pc.replaceMode )
 

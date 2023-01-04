@@ -64,10 +64,11 @@ type pageContext struct {
 
 // should never be called without a current page and valid context
 func getCurrentPageContext( ) *pageContext {
-    if pc := getCurrentWorkAreaPageContext(); pc != nil {
-        return pc
+    pc := getCurrentWorkAreaPageContext();
+    if pc == nil {
+        log.Panicln("No current page context")
     }
-    panic("No current page context\n")
+    return pc
 }
 
 // may be called without a current page
@@ -118,6 +119,7 @@ func copySelection( ) {
     pc := getCurrentPageContext( )
     s, l := pc.getSelection()
     if s != -1 {
+        log.Printf( "copySelection [%d, %d[ (caret=%d)\n", s, s+l, pc.caretPos)
         pc.store.copyBytesAt( s, l )
     }
 }
@@ -126,7 +128,7 @@ func cutSelection( ) {
     pc := getCurrentPageContext( )
     s, l := pc.getSelection()
     if s != -1 {
-fmt.Printf("cut selection s=%d, l=%d, caret=%d\n", s, l, pc.caretPos)
+        log.Printf( "cutSelection [%d, %d[ (caret=%d)\n", s, s+l, pc.caretPos)
         pc.store.cutBytesAt( s, 0, l )
         pc.resetSelection( )
         pc.canvas.QueueDraw( )    // force redraw
@@ -138,14 +140,15 @@ func pasteClipboard( ) {
         pc := getCurrentPageContext()
         s, l := pc.getSelection()
         if s != -1 {    // valid current selection to replace with clipboard
+            log.Printf( "pasteClipboard: replace selection [%d,%d[\n", s, s+l )
             err := pc.store.replaceWithClipboardAt( s, 0, l, cb )
             if err != nil {
-                panic("Invalid selection\n")
+                log.Panicln("pasteClipboard: failed to replace selection")
             }
             pc.resetSelection()
         } else {        // no current selection, just insert at caret
             bytePos := pc.caretPos >> 1
-fmt.Printf("pasteClipboard: insert at caret pos=%d\n", bytePos )
+            log.Printf("pasteClipboard: insert at caret pos=%d\n", bytePos )
             if pc.caretPos & 1 == 0 {   // if caret is even, just insert as is
                 pc.store.insertClipboardAt( bytePos, pc.caretPos & 1, cb )
             } else {    // otherwise, replace 2 nibbles with clipbard data:
@@ -171,32 +174,36 @@ fmt.Printf("pasteClipboard: insert at caret pos=%d\n", bytePos )
 // bit 2 codes the caret move when redoing: 0 => move ahead, 1 => move back 
 
 func undoLast( ) {
+    log.Println( "undoLast" )
     pc := getCurrentPageContext()
     pos, tag, err := pc.store.undo()
     if err != nil {
-        panic( err.Error )
+        log.Panicf( "undoLast: failed to undo: %v\n", err )
     }
     pc.setCaretPosition( (2 * pos) + (tag & 0x03),  ABSOLUTE )
     pc.canvas.QueueDraw( )    // force redraw
 }
 
 func redoLast( ) {
+    log.Println( "redoLast" )
     pc := getCurrentPageContext()
     pos, tag, err := pc.store.redo()
     if err != nil {
-        panic( err.Error )
+        log.Panicf( "redoLast: failed to undo: %v\n", err )
     }
     pc.setCaretPosition( (2 * pos) + (tag >> 2),  ABSOLUTE )
     pc.canvas.QueueDraw( )    // force redraw
 }
 
 func deleteSelection( ) {
+    log.Println( "deleteSelection" )
     pc := getCurrentPageContext()
     pc.delCommand( )
     pc.canvas.QueueDraw( )    // force redraw
 }
 
 func selectAll( ) {
+    log.Println( "selectAll" )
     pc := getCurrentPageContext()
     pc.setCaretPosition( -1, END )    // set caret at 0
     pc.sel.start = 0
@@ -208,7 +215,7 @@ func selectAll( ) {
 func showHighlights( matchIndex, number int, bytePos int64 ) {
     pc := getCurrentPageContext()
     pc.search = number > 0
-fmt.Printf( "showHighlights: number=%d, matchIndex=%d\n", number, matchIndex )
+    printDebug( "showHighlights: number=%d, matchIndex=%d\n", number, matchIndex )
     if matchIndex != -1 {
         showApplicationStatus( fmt.Sprintf(  localizeText( match ),
                                matchIndex + 1, number ) )
@@ -227,6 +234,7 @@ fmt.Printf( "showHighlights: number=%d, matchIndex=%d\n", number, matchIndex )
 }
 
 func removeHighlights() {
+    printDebug( "removeHighlights\n" )
     removeApplicationStatus()
 }
 
@@ -244,8 +252,6 @@ func ( pc *pageContext ) rowClip( n int, rY, cL, cH float64 ) ( y, h float64 ) {
         endY = cH
     }
     h = endY -cL - y
-//fmt.Printf( "clip low=%f, high=%f, nrows=%d rY=%f=> y=%f, h=%f\n",
-//            cL, cH, n, rY, y, h )
     return
 }
 
@@ -405,8 +411,6 @@ func (pc *pageContext)getDataNibbleIndexFromHex( x float64,
     } else {
         col = 2 * byteCol + 1
     }
-//fmt.Printf("getDataNibbleIndexFromHex: x=%f, hexInc=%d, byteCol=%d, delta=%f, col=%d, row=%d\n",
-//           x, hexIncX, byteCol, delta, col, row)
     index = (row * 2 * int64(pc.nBytesLine)) + col
     return
 }
@@ -415,21 +419,16 @@ func (pc *pageContext)getDataNibbleIndexFromAsc( x float64,
                                                  row int64 ) (index int64) {
     ascIncX := getCharWidth()                   // size of 1 asc byte on screen
     col := int64(x / float64(ascIncX)) << 1     // nibble index
-
-//fmt.Printf("getDataNibbleIndexFromAsc: x=%f, ascInc=%d, col=%d, row=%d\n",
-//           x, hexIncX, col, row)
-
     index = (row * 2 * int64(pc.nBytesLine)) + col
     return
 }
 
 func (pc *pageContext)getDataRow( y float64 ) (row int64, up, down bool ) {
-//    fmt.Printf( "x=%f, y=%f\n", x, y )
     if y < 0 {
-        fmt.Printf( "move up (y = %f)\n", y )
+        printDebug( "getDataRow: move up (y = %f)\n", y )
         up = true
     } else if y > float64(pc.height) {
-        fmt.Printf( "move down (y = %f)\n", y )
+        printDebug( "getDataRow: move down (y = %f)\n", y )
         down = true
     }
 
@@ -505,13 +504,12 @@ func (pc *pageContext) showContextPopup( event  *gdk.Event ) {
 func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
     buttonEvent := gdk.EventButtonNewFromEvent( event )
     evButton := buttonEvent.Button()
-//    fmt.Printf("Event button=%d\n", evButton)
+    printDebug("moveCaret: mouse button=%d\n", evButton)
 
     requestPageFocus( )
     pc := getCurrentPageContext()
 
     if evButton != gdk.BUTTON_PRIMARY {
-fmt.Printf("Pressed mouse button %d\n", evButton )
         pc.showContextPopup( event )
         return true
     }
@@ -522,16 +520,16 @@ fmt.Printf("Pressed mouse button %d\n", evButton )
     modifier := gdk.ModifierType(buttonEvent.State())
     if 0 != modifier & gdk.SHIFT_MASK {
         pc.sel.active = true
-        fmt.Printf("extend selection from previous position\n")
+        printDebug("extend selection from previous position\n")
         pc.extendSelection( x, y )
         return false
     }
 
     index, _, _ := pc.getDataNibbleIndex( x, y )
     if index == -1 {
-        fmt.Printf( "Button pressed @x=%f, y=%f: not on data\n", x, y )
+        printDebug( "Button pressed @x=%f, y=%f: not on data\n", x, y )
     } else {
-        fmt.Printf( "Button pressed @x=%f, y=%f: index %d\n", x, y, index )
+        printDebug( "Button pressed @x=%f, y=%f: index %d\n", x, y, index )
         pc.setCaretPosition( index - pc.caretPos, NIBBLE )
         pc.sel.active = true
         pc.canvas.QueueDraw( )    // force redraw
@@ -550,12 +548,12 @@ func (pc *pageContext) extendSelection( x, y float64 ) {
         prevStart := pc.sel.start
         prevBeyond := pc.sel.beyond
         if pc.sel.start == -1 {
-//fmt.Printf( "updateSelection: first index=%d\n", index )
+        printDebug( "updateSelection: first index=%d\n", index )
             pc.sel.start  = index
             pc.sel.beyond = index + 1
         } else {
-//fmt.Printf("before: start %d, beyond %d, move %d, new %d\n",
-//            prevStart, prevBeyond, pc.sel.move, index )
+            printDebug( "before: start %d, beyond %d, move %d, new %d\n",
+                        prevStart, prevBeyond, pc.sel.move, index )
             switch pc.sel.move {
             case LEFT:
                 pc.sel.start = index
@@ -580,16 +578,16 @@ func (pc *pageContext) extendSelection( x, y float64 ) {
             }
         }
         if prevStart != pc.sel.start || prevBeyond != pc.sel.beyond {
-//fmt.Printf("after start %d, beyond %d move %d\n",
-//            pc.sel.start, pc.sel.beyond, pc.sel.move )
+            printDebug( "after start %d, beyond %d move %d\n",
+                        pc.sel.start, pc.sel.beyond, pc.sel.move )
             if pc.sel.start >= pc.sel.beyond {
-                panic("Wrong selection\n")
+                log.Panicln("Wrong selection")
             }
             if up {
-                fmt.Printf("Move up: %#x (was %#x)\n", pc.sel.start, prevStart)
+                printDebug("Move up: %#x (was %#x)\n", pc.sel.start, prevStart)
                 pc.scrollPositionUpdate( pc.sel.start * 2 )
             } else if down {
-                fmt.Printf("Move down: %#x (was %#x)\n", pc.sel.beyond, prevBeyond)
+                printDebug("Move down: %#x (was %#x)\n", pc.sel.beyond, prevBeyond)
                 pc.scrollPositionUpdate( pc.sel.beyond * 2 )
             }
             pc.canvas.QueueDraw( )    // force redraw
@@ -606,10 +604,6 @@ func updateSelection( da *gtk.DrawingArea, event *gdk.Event ) {
 
     motionEvent := gdk.EventMotionNewFromEvent( event )
     x, y := motionEvent.MotionVal( )
-//    modifier := motionEvent.State( )
-//    if 0 != modifier & gdk.SHIFT_MASK {
-//        fmt.Printf("extend selection from previous position\n")
-//    }
     pc.extendSelection( x, y )
 }
 
@@ -621,7 +615,6 @@ func (pc *pageContext) validateSelection( ) {
 }
 
 func endSelection( da *gtk.DrawingArea, event *gdk.Event ) {
-    // TODO: check event button #
     pc := getCurrentPageContext()
     if pc.sel.active == true {
         pc.validateSelection( )
@@ -638,7 +631,7 @@ func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
     selectFont( cr )
     cr.SetOperator( cairo.OPERATOR_SOURCE )
     setAddBackgroundColor( cr )
-    cr.Paint( ) // temporarily - later add a rectangle for each area
+    cr.Paint( ) // TODO: rectangle for each area
 
     hRect, aRect := pc.getAreasRectangle( )
     setHexBackgroundColor( cr )
@@ -651,12 +644,12 @@ func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
     hr, ar := pc.getSelectionBoundingRectangles( &pc.sel )
     setSelectionColor( cr )
     for _, r := range hr {
-//        fmt.Printf( "sel rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
+        printDebug( "sel hexa rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
         cr.Rectangle( r.x, r.y, r.w, r.h )
     }
     cr.Fill( )
     for _, r := range ar {
-//        fmt.Printf( "sel rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
+        printDebug( "sel asci rectangle x=%f, y=%f, w=%f, h=%f\n", r.x, r.y, r.w, r.h )
         cr.Rectangle( r.x, r.y, r.w, r.h )
     }
     cr.Fill( )
@@ -670,8 +663,8 @@ func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
             } else {
                 setOtherMatchesColor( cr )
             }
-//            fmt.Printf( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
-//                        r.atCaret, r.x, r.y, r.w, r.h )
+            printDebug( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
+                        r.atCaret, r.x, r.y, r.w, r.h )
             cr.Rectangle( r.x, r.y, r.w, r.h )
             cr.Fill( )
         }
@@ -682,7 +675,7 @@ func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
             } else {
                 setOtherMatchesColor( cr )
             }
-            fmt.Printf( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
+            printDebug( "highlight rectangle atCaret=%v x=%f, y=%f, w=%f, h=%f\n",
                         r.atCaret, r.x, r.y, r.w, r.h )
             cr.Rectangle( r.x, r.y, r.w, r.h )
             cr.Fill( )
@@ -702,7 +695,7 @@ func (pc *pageContext) scrollPositionFollowPage( pos int64, pagePos float64 ) {
     newPageFirstLine := (pos / int64(pc.nBytesLine << 1)) -
                         (pc.caretPos / int64(pc.nBytesLine << 1))  + currentPageFirstLine
     newOrigin := newPageFirstLine * charHeight
-fmt.Printf("scrollPositionFollowPage: origin=%d cPos=%d cFL=%d nPos=%d nFL=%d nOrigin=%d\n",
+    printDebug("scrollPositionFollowPage: origin=%d cPos=%d cFL=%d nPos=%d nFL=%d nOrigin=%d\n",
             origin, pc.caretPos, currentPageFirstLine, pos, newPageFirstLine, newOrigin)
 
     adj.SetValue( float64( newOrigin ) )
@@ -750,7 +743,7 @@ func mouseScroll( da *gtk.DrawingArea, event *gdk.Event ) bool {
 
     switch direction {
     case gdk.SCROLL_UP:
-//        fmt.Printf("scroll up\n")
+        printDebug("scroll up\n")
         if origin >= inc {
             origin -= inc
         } else {
@@ -758,7 +751,7 @@ func mouseScroll( da *gtk.DrawingArea, event *gdk.Event ) bool {
         }
 
     case gdk.SCROLL_DOWN:
-//        fmt.Printf("scroll down\n")
+        printDebug("scroll down\n")
         if origin + pageSize < upper - inc {
             origin += inc
         } else {
@@ -789,18 +782,18 @@ func (pc *pageContext) updateScrollFromAreaHeight( height int ) {
 
     pc.barAdjust.SetPageSize( float64(height) ) // set new size and
     if pos >= upper - pageSize {                // fix position if needed
-//fmt.Printf("updateScrollFromAreaHeight: fixing pos\n")
+        printDebug("updateScrollFromAreaHeight: fixing pos\n")
         pc.barAdjust.SetValue( upper - float64(height) )
     }
     if float64(height) >= upper {
-//fmt.Printf("updateScrollFromAreaHeight: Hiding scrollbar\n")
+        printDebug("updateScrollFromAreaHeight: Hiding scrollbar\n")
         pc.scrollBar.Hide()
     } else {
-fmt.Printf("updateScrollFromAreaHeight: Showing scrollbar\n")
+        printDebug("updateScrollFromAreaHeight: Showing scrollbar\n")
 //        minWidth, naturalWidth := pc.scrollBar.GetPreferredWidth()
 //        allocated := pc.scrollBar.GetAllocatedWidth()
-//fmt.Printf("updateScrollFromAreaHeight: minWidth=%d, naturalWidth=%d allocated=%d\n",
-//            minWidth, naturalWidth, allocated)
+//        printDebug("updateScrollFromAreaHeight: minWidth=%d, naturalWidth=%d allocated=%d\n",
+//                   minWidth, naturalWidth, allocated)
         pc.scrollBar.Show()
     }
 }
@@ -816,11 +809,11 @@ func (pc *pageContext) updateScrollFromDataGridChange( nBytesLine int,
                                                        nLines int64 ) {
 
     if pc.nBytesLine != nBytesLine {
-        fmt.Printf("updateScrollFromDataGridChange: new bytesLine=%d\n", nBytesLine)
+        printDebug("updateScrollFromDataGridChange: new bytesLine=%d\n", nBytesLine)
         pc.nBytesLine = nBytesLine
     }
     if pc.nLines != nLines {
-        fmt.Printf("updateScrollFromDataGridChange: new line count=%d\n", nLines)
+        printDebug("updateScrollFromDataGridChange: new line count=%d\n", nLines)
         pc.nLines = nLines
     }
     if pc.store.length() % int64(pc.nBytesLine) == 0 { // force 1 extra row
@@ -833,7 +826,7 @@ func (pc *pageContext) updateScrollFromDataGridChange( nBytesLine int,
 
     upper := pc.barAdjust.GetUpper()
     newUpper := float64( (nLines * charHeight) + charDescent )
-    fmt.Printf( "=> updated line count=%d, upper=%f newUpper=%f\n",
+    printDebug( "updateScrollFromDataGridChange: updated line count=%d, upper=%f newUpper=%f\n",
                 nLines, upper, newUpper )
     if upper != newUpper {
         pc.barAdjust.SetUpper( newUpper )
@@ -843,16 +836,16 @@ func (pc *pageContext) updateScrollFromDataGridChange( nBytesLine int,
 
         if newUpper < pos + pageSize {
             newPos := getMaxPosition( newUpper, pageSize )
-            fmt.Printf( "=> updated scroll position from %f to %f (pageSize=%f)\n",
+            printDebug( "updateScrollFromDataGridChange: updated scroll position from %f to %f (pageSize=%f)\n",
                         pos, newPos, pageSize )
             pc.barAdjust.SetValue( newPos )
         }
         if pageSize >= newUpper {
-fmt.Printf("=> Hiding scroll bar\n")
+            printDebug("updateScrollFromDataGridChange: Hiding scroll bar\n")
             pc.scrollBar.Hide()
         } else {
             pc.scrollBar.Show()
-fmt.Printf("=> Showing scroll bar\n")
+            printDebug("updateScrollFromDataGridChange: Showing scroll bar\n")
         }
     }
 }
@@ -876,7 +869,7 @@ func updateScrollFromAreaSizeChange( da *gtk.DrawingArea, event *gdk.Event ) {
     configEvent := gdk.EventConfigureNewFromEvent( event )
     height := configEvent.Height()
     width := configEvent.Width()
-fmt.Printf("updateScrollFromAreaSizeChange: width=%d, height=%d\n", width, height)
+    printDebug("updateScrollFromAreaSizeChange: width=%d, height=%d\n", width, height)
     pc := getCurrentPageContext()
     pc.processAreaSizeChange( width, height )
 }
@@ -888,8 +881,8 @@ func updatePagePosition( adj *gtk.Adjustment ) {
     pInc := adj.GetPageIncrement()
     sInc := adj.GetStepIncrement()
     pos := adj.GetValue()
-fmt.Printf("updatePagePosition: size=%f, upper=%f, lower=%f, page inc=%f step inc=%f pos=%f\n",
-            size, upper, lower, pInc, sInc, pos)
+    printDebug("updatePagePosition: size=%f, upper=%f, lower=%f, page inc=%f step inc=%f pos=%f\n",
+               size, upper, lower, pInc, sInc, pos)
     pc := getCurrentPageContext()
     pc.canvas.QueueDraw( )    // force redraw
 }
@@ -901,7 +894,7 @@ func drawCaret( pc *pageContext, cr *cairo.Context ) {
 
     col := bPos % int64(pc.nBytesLine)
     row := bPos / int64(pc.nBytesLine)
-//fmt.Printf("caret pos=%d col=%d row=%d\n",  pc.caretPos, col, row)
+    printDebug("drawCaret: pos=%d col=%d row=%d\n", pc.caretPos, col, row)
 
     cw, ch, cd := getCharSizes( )
     lineStart, lineBeyond, Ypos := pc.getDataLinesNYPos()
@@ -912,7 +905,6 @@ func drawCaret( pc *pageContext, cr *cairo.Context ) {
 
         cr.SetLineWidth( 1.5 )
         setCaretColor( cr )
-//        cr.SetSourceRGB( 1.0, 1.0, 1.0 )
         cr.MoveTo( x, yStart )
         cr.LineTo( x, yStart + float64( ch ) )
         cr.Stroke( )
@@ -934,21 +926,15 @@ func drawCaret( pc *pageContext, cr *cairo.Context ) {
 */
 func (pc *pageContext)getDataLinesNYPos( ) ( start, end int64, yPos float64 ) {
     adj := pc.barAdjust
-//    upper := adj.GetUpper()
-//    lower := adj.GetLower()
-//    pInc := adj.GetPageIncrement()
-
     pos := adj.GetValue()
     size := adj.GetPageSize()
-//fmt.Printf("getDataLinesNYPos: size=%f, upper=%f, lower=%f, inc=%f pos=%f\n",
-//            size, upper, lower, pInc, pos)
 
     ch := getCharHeight( )
     pixelStart := int64( pos ) //- int64( pc.font.charDescent )
     start = pixelStart / int64( ch )
     pixelBeyond := pixelStart + int64( size )
-//fmt.Printf("getDataLinesNYPos: pixelStart=%d, pixelBeyond=%d\n",
-//            pixelStart, pixelBeyond)
+    printDebug( "getDataLinesNYPos: pixelStart=%d, pixelBeyond=%d\n",
+                pixelStart, pixelBeyond )
     end = (pixelBeyond + int64(ch) - 1) / int64(ch)
     yPos = float64(ch + int(start * int64(ch) - pixelStart))
     return
@@ -958,8 +944,8 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
 
     pc := getCurrentPageContext()
     startLine, beyondLine, lineYPos := pc.getDataLinesNYPos( )
-//fmt.Printf("drawDataLines: start=%d, end=%d, yPos=%f\n",
-//            startLine, beyondLine, lineYPos)
+    printDebug( "drawDataLines: start=%d, end=%d, yPos=%f\n",
+                startLine, beyondLine, lineYPos )
     pc.drawDataBackground( cr )
 
     nBL := pc.nBytesLine
@@ -976,8 +962,8 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
         stop = dataLen
     }
 
-//    fmt.Printf("start address=%d, stop=%d, dataLen=%d, lineYPos=%f\n",
-//                address, stop, dataLen, lineYPos)
+    printDebug( "drawDataLines: address=%d, stop=%d, dataLen=%d, lineYPos=%f\n",
+                 address, stop, dataLen, lineYPos )
     cw, ch, _ := getCharSizes( )
     for {
         cr.MoveTo( 0.0, lineYPos )
@@ -1049,7 +1035,7 @@ func (pc *pageContext)setStorage( path string ) (err error) {
         explorePossible( pc.caretPos < ( l << 1 ) )
         nLines := (l + int64(pc.nBytesLine) -1) / int64(pc.nBytesLine)
 
-//fmt.Printf("updateStoreLength: nLines.previous=%d, .new=%d\n", pc.nLines, nLines )
+        printDebug("updateStoreLength: nLines.previous=%d, .new=%d\n", pc.nLines, nLines )
         pc.updateScrollFromDataGridChange( pc.nBytesLine, nLines )
     }
     pc.store, err = initStorage( path )
@@ -1080,8 +1066,8 @@ func reloadPageContent( path string ) {
 func (pc *pageContext) refresh( ) {
     width := pc.canvas.GetAllocatedWidth( )
     height := pc.canvas.GetAllocatedHeight( )
-//fmt.Printf("Refresh: width old=%d, new=%d; height old=%d, new=%d\n",
-//            pc.width, width, pc.height, height)
+    printDebug( "refresh: width old=%d, new=%d; height old=%d, new=%d\n",
+                pc.width, width, pc.height, height )
     pc.processAreaSizeChange( width, height )
     pc.showBytePosition()
     showInputMode( pc.tempReadOnly, pc.replaceMode )
@@ -1109,7 +1095,7 @@ func (pc *pageContext) refresh( ) {
 func (pc *pageContext) setTempReadOnly( readOnly bool ) {
     if pc.readOnly {
         if ! pc.tempReadOnly {
-            panic("Inconsistent read only state\n")
+            log.Panicln("Inconsistent read only state")
         }
     } else {
         pc.tempReadOnly = readOnly
@@ -1166,8 +1152,8 @@ func (pc *pageContext) getMinAreaSize( ) (int, int) {
 func (pc *pageContext) updateLineSizeFromAreaSize( totalWidth int ) (nBL int, nL int64 ) {
 // Starting from the minimum line size in bytes, its size can be incremented
 // only by a multiple of a fixed amount.
-fmt.Printf("updateLineSizeFromAreaSize: totalWidth=%d, current nBytesLine=%d, nLines=%d\n",
-            totalWidth, pc.nBytesLine, pc.nLines)
+    printDebug( "updateLineSizeFromAreaSize: totalWidth=%d, current nBytesLine=%d, nLines=%d\n",
+                totalWidth, pc.nBytesLine, pc.nLines )
     cw := getCharWidth( )
     nBL = getIntPreference( MIN_BYTES_LINE )
     maxBL := getIntPreference( MAX_BYTES_LINE )
@@ -1185,7 +1171,7 @@ fmt.Printf("updateLineSizeFromAreaSize: totalWidth=%d, current nBytesLine=%d, nL
     }
     if nBL != pc.nBytesLine {
         nL = pc.calculateNumberOfLines( nBL )
-fmt.Printf("updateLineSizeFromAreaSize: new nBytesLine=%d, nLines=%d\n", nBL, nL)
+        printDebug("updateLineSizeFromAreaSize: new nBytesLine=%d, nLines=%d\n", nBL, nL)
     } else {
         nL = pc.nLines
     }
@@ -1270,7 +1256,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     nBytesLine, nLines := pc.updateLineSizeFromAreaSize( 0 )
     pc.updateScrollFromDataGridChange( nBytesLine, nLines )
 
-    fmt.Printf( "nBytesLine=%d, nLines=%d, minWidth=%d\n",
+    printDebug( "init: nBytesLine=%d, nLines=%d, minWidth=%d\n",
                 pc.nBytesLine, pc.nLines, minWidth )
 
     showPosition( fmt.Sprintf(  pc.addFmt, 0 ) )
@@ -1284,7 +1270,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
 func updatePageForFont( ) {
     if pc := getCurrentWorkAreaPageContext(); pc != nil {
         w, h := pc.getMinAreaSize( )
-        fmt.Printf( "updatePageForFont: min Width=%d hight=%d\n", w, h )
+        printDebug( "updatePageForFont: min Width=%d hight=%d\n", w, h )
         pc.canvas.SetSizeRequest( w, h )
         pc.canvas.QueueDraw( )          // force redraw
     }
@@ -1336,9 +1322,8 @@ func pageGiveFocus( ) {
 // split from init to allow signals access to global context
 // must be called after setting the context returned by newPageContent
 func (pc *pageContext)activate( ) {
-//fmt.Printf("activate: width, height = %d, %d\n", width, height )
-    pc.barAdjust.Connect( "value-changed", updatePagePosition )
 
+    pc.barAdjust.Connect( "value-changed", updatePagePosition )
     da := pc.canvas
     da.SetEvents( int(gdk.EXPOSURE_MASK | gdk.BUTTON_PRESS_MASK |
                       gdk.BUTTON_RELEASE_MASK | gdk.KEY_RELEASE_MASK |
@@ -1372,10 +1357,8 @@ func updateLineSizeFromPreferencesChange( ) {
 
         var nBL int
         if pc.nBytesLine < minNBL {
-//fmt.Printf("Setting min number of bytes per Line to %d (MIN)\n", minNBL)
             nBL = minNBL
         } else if pc.nBytesLine > maxNBL {
-//fmt.Printf("Setting min number of bytes per Line to %d (MAX)\n", maxNBL)
             nBL = maxNBL
         } else {
             nBLInc := getIntPreference( LINE_BYTE_INC )
@@ -1385,21 +1368,14 @@ func updateLineSizeFromPreferencesChange( ) {
                 if offset > nBLInc / 2 {
                     nBL += nBLInc
                 }
-//fmt.Printf("Setting min number of bytes per Line to %d\n", nBL)
-//fmt.Printf("current nBytesLines= %d minNBL=%d nBLInc=%d offset=%d\n",
-//           pc.nBytesLine, minNBL, nBLInc, offset)
-            } else {
-//fmt.Printf("Ignoring change, current nBytesLines= %d minNBL=%d nBLInc=%d offset=%d\n",
-//           pc.nBytesLine, minNBL, nBLInc, offset)
+            } else {        // no effect on nBytesLine
                 minWidth, minHeight := pc.getMinAreaSize()
-//fmt.Printf("Setting size request to %d, %d\n", minWidth, minHeight )
                 pc.canvas.SetSizeRequest( minWidth, minHeight )
-                return      // no effect on nBytesLine
+                return
             }
         }
         nL := pc.calculateNumberOfLines( nBL )
         minWidth, minHeight := pc.getMinAreaSize()
-//fmt.Printf("Setting size request to %d, %d\n", minWidth, minHeight )
         pc.canvas.SetSizeRequest( minWidth, minHeight )
         pc.updateScrollFromDataGridChange( nBL, nL )
     }
@@ -1433,7 +1409,7 @@ func newPageContent( name string, readOnly bool ) (content *gtk.Widget,
                                                    context *pageContext,
                                                    err error) {
     if main == nil {
-        panic("newPageContent: no workarea yet\n")
+        log.Panicln("newPageContent: no workarea yet")
     }
 
     context = new( pageContext )

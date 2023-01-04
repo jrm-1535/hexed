@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "log"
     "os"
 )
 
@@ -44,28 +45,28 @@ type storage struct {
 // some debug functions
 
 func (s *storage) print(  ) {
-    fmt.Printf("Storage %v\n", s.curData )
+    printDebug("Storage %v\n", s.curData )
 }
 
 func (s *storage) printInternal( ) {
-    fmt.Printf( "newData storage %v\n", s.newData )
-    fmt.Printf( "cutData storage %v\n", s.cutData )
+    printDebug( "newData storage %v\n", s.newData )
+    printDebug( "cutData storage %v\n", s.cutData )
 }
 
 func (s *storage) printStack( ) {
-    fmt.Printf( "Stack length %d, top=%d\n", len(s.stack), s.top )
+    printDebug( "Stack length %d, top=%d\n", len(s.stack), s.top )
     for i, op := range s.stack {
         if i == s.top {
-            fmt.Printf( "  ------------------------------------\n" )
+            printDebug( "  ------------------------------------\n" )
         }
 
         switch op := op.(type) {
         case singlePosOp:
-            fmt.Printf( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
+            printDebug( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
                         i, op.tag, op.delLen, op.insLen, op.backup, op.cut,
                         1, op.position )
         case multiPosOp:
-            fmt.Printf( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
+            printDebug( "  @%d tag %d, delLen %d, insLen %d, back %d, cut %d, nPos %d pos[0] %d\n",
                         i, op.tag, op.delLen, op.insLen, op.backup, op.cut,
                         len(op.positions), op.positions[0] )
         }
@@ -93,7 +94,8 @@ func (s *storage) setNotifyDataChange( f func() ) {
 // Beware, it is only a shallow copy: DO NOT MODIFY the returned data
 func (s *storage) getData( start, beyond int64 ) []byte {
     if start < 0 || start > beyond || beyond > int64(len(s.curData)) {
-fmt.Printf("getData: start %d, beyond %d out of range [0-%d]\n", start, beyond, len(s.curData))
+        printDebug( "getData: start %d, beyond %d out of range [0-%d]\n",
+                    start, beyond, len(s.curData) )
         return nil
     }
     return s.curData[start:beyond]
@@ -190,9 +192,9 @@ func (s *storage) undo( ) (pos, tag int64, err error) {
         tag = op.tag
         pos = op.positions[0]
         c := op.cut
-fmt.Printf( "undo multiPosOp: tag=%d insLen=%d delLen=%d nPos=%d pos=%v\n",
-            tag, op.insLen, op.delLen, len(op.positions), op.positions )
-fmt.Printf("       backup=%d %v cut=%d %v\n", op.backup, s.newData, op.cut, s.cutData )
+//fmt.Printf( "undo multiPosOp: tag=%d insLen=%d delLen=%d nPos=%d pos=%v\n",
+//            tag, op.insLen, op.delLen, len(op.positions), op.positions )
+//fmt.Printf("       backup=%d %v cut=%d %v\n", op.backup, s.newData, op.cut, s.cutData )
         s.replaceInCurDataAtMultipleLocations( op.positions, tag, op.insLen,
                                                s.cutData[c:c+op.delLen], false )
     }
@@ -206,7 +208,7 @@ fmt.Printf("       backup=%d %v cut=%d %v\n", op.backup, s.newData, op.cut, s.cu
 // and does not save the restored data again, since the command slice, backup
 // and cut storages are still valid: the top of the stack is just incremented.
 func (s *storage) redo( ) (pos, tag int64, err error) {
-    //fmt.Printf( "REDO stack pointer %d\n", s.top )
+
     if s.top >= len( s.stack ) {
         err = fmt.Errorf( "redo stack empty\n" )
         return
@@ -232,7 +234,6 @@ func (s *storage) redo( ) (pos, tag int64, err error) {
         s.replaceInCurDataAtMultipleLocations( op.positions, op.tag, op.delLen,
                                                s.newData[b:b+op.insLen], true )
     }
-
     return
 }
 
@@ -262,7 +263,7 @@ func (s *storage) pushSinglePosOp( p, t, dl, il int64 ) {
                                             int64(len(s.cutData)), p } )
     s.top ++
     if s.top < len( s.stack ) {
-        panic( "pushSinglePosOp not at top of stack" )
+        log.Panicln( "pushSinglePosOp not at top of stack" )
     }
     s.notifyUndoRedo( true, false )
 }
@@ -285,21 +286,21 @@ func (s *storage) cleanStack( ) {
             switch op := op.(type) {
             case singlePosOp:
                 b, c = op.backup, op.cut
-                fmt.Printf( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
+                printDebug( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
                             s.top, op.tag, op.delLen, op.insLen,
                             1, op.position )
             case multiPosOp:
                 b, c = op.backup, op.cut
-                fmt.Printf( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
+                printDebug( "UNDO/REDO @%d, tag=%d delLen=%d insLen=%d nPos=%d pos[0]=%d lost\n",
                             s.top, op.tag, op.delLen, op.insLen,
                             len(op.positions), op.positions[0] )
             }
             // REPLACE, or INSERT (no cut data) or DELETE (no new data)
             if int64(len(s.newData)) < b {
-                panic( "push: newData inconsistent\n" );
+                log.Panicln( "push: newData inconsistent" );
             }
             if int64(len(s.cutData)) < c {
-                panic( "push: cutData inconsistent\n" );
+                log.Panicln( "push: cutData inconsistent" );
             }
             s.newData = s.newData[:b]
             s.cutData = s.cutData[:c]
@@ -364,7 +365,7 @@ func (s *storage) insertInCurData( pos, tag int64, data []byte, save bool ) erro
         }
     }
     if il != int64(len( s.curData )) - cl {
-        panic("INSERT: Wrong length after insertion\n")
+        log.Panicln("INSERT: Wrong length after insertion")
     }
     if s.notifyLenChange != nil {
         s.notifyLenChange( s.length())
