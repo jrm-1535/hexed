@@ -40,6 +40,8 @@ type storage struct {
     notifyDataChange    func( )
     notifyLenChange     func( l int64 )
     notifyUndoRedo      func( u, r bool )
+
+    lost                bool            // true if full undo history is unknown
 }
 
 // some debug functions
@@ -76,6 +78,14 @@ func (s *storage) printStack( ) {
 // return current storage length
 func (s *storage) length() int64 {
     return int64(len(s.curData))
+}
+
+// return whether storage is presumed modified since creation/load
+func (s *storage)isDirty( ) bool {
+    if s.lost {
+        return true
+    }
+    return s.top > 0
 }
 
 func (s *storage) setNotifyLenChange( f func( int64 ) ) {
@@ -134,6 +144,7 @@ func (s *storage)reload( path string ) error {
     s.cutData = nil
     s.stack = make( []interface{}, 0, defUndoSize )
     s.top = 0
+    s.lost = false
     if s.curData, err = os.ReadFile( path ); err == nil {
         if s.notifyDataChange != nil {
             s.notifyDataChange()
@@ -304,6 +315,7 @@ func (s *storage) cleanStack( ) {
             }
             s.newData = s.newData[:b]
             s.cutData = s.cutData[:c]
+            s.lost = true
         }
         s.stack = s.stack[:s.top]
     }

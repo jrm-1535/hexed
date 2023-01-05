@@ -1050,8 +1050,7 @@ func (pc *pageContext)setStorage( path string ) (err error) {
     return
 }
 
-func reloadPageContent( path string ) {
-    pc := getCurrentPageContext()
+func (pc *pageContext)reloadContent( path string ) {
     err := pc.store.reload( path )
     if err == nil {
         pc.showBytePosition()
@@ -1107,12 +1106,14 @@ func (pc *pageContext) setTempReadOnly( readOnly bool ) {
     }
 }
 
-func (pc *pageContext) isPageModified( ) bool {
+func (pc *pageContext) isPageModified( path string ) bool {
     if pc.readOnly {
         return false
     }
-    // TODO: find a way to kown if content has been modified since last save
-    return true
+    if path == "" && 0 == pc.store.length() {
+        return false
+    }
+    return pc.store.isDirty( )
 }
 
 // Each line is broken up in 3 parts, the address part, the hexadecimal one
@@ -1421,8 +1422,7 @@ func newPageContent( name string, readOnly bool ) (content *gtk.Widget,
     return
 }
 
-func savePageContentAs( path string ) (err error) {
-    pc := getCurrentPageContext()
+func (pc *pageContext) saveContentAs( path string ) (err error) {
     if getBoolPreference( CREATE_BACKUP_FILES ) {
         backupPath := path + "~"
         if err := os.Rename( path, backupPath ); err != nil {

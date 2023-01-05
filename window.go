@@ -46,6 +46,70 @@ type page struct {                          // a page is made of
     path    string                          // page file path
 }
 
+func (pg *page)getPath( ) string {
+    return pg.path
+}
+
+func (pg *page)getContext( ) *pageContext {
+    return pg.context
+}
+
+func (pg *page)save( ) {
+    if pg.path == "" {
+        pg.saveAs( )
+    } else {
+        pg.context.saveContentAs( pg.path )
+    }
+}
+
+func (pg *page)saveAs( ) {
+    pathName := saveFileName( )
+    if pathName != "" {
+        log.Printf( "saveAs: file %s\n", pathName )
+        err := pg.context.saveContentAs( pathName )
+        if err != nil {
+            errorDisplay( "Unable to save file %s (%v)", pathName, err )
+        } else {
+            pg.path = pathName
+            name := filepath.Base( pathName )
+            pg.label.SetText(name)
+            fileExists( true )
+        }
+    }
+}
+
+func (pg *page)remove( pn int ) bool {
+
+    if -1 == pn || pn >= len( mainArea.pages ) {
+        log.Panicf( "remove: page %d is not in workArea", pn )
+    }
+    pc := pg.context
+    if pc != nil && pc.isPageModified( pg.path ) {
+        mainArea.selectPage( pn ) // show the page correspinding to close dialog
+        switch closeFileDialog() {
+        case CANCEL:
+            return false
+        case SAVE_THEN_DO:
+            pg.save( )
+        case DO:
+        }
+    }
+    log.Printf( "remove: Page number %d (label %s, path <%s>)\n",
+                pn, pg.label.GetLabel(), pg.path )
+    mainArea.removePage( pn )
+    return true
+}
+
+func removeAllPages( ) bool {
+    for pn := len(mainArea.pages)-1; pn >= 0; pn -- {
+        pg := mainArea.pages[pn]
+        if ! pg.remove( pn ) {
+            return false
+        }
+    }
+    return true
+}
+
 func printDebug( format string, args ...interface{} ) {
     if hexedDebug {
         msg := fmt.Sprintf( format, args... )
@@ -81,87 +145,74 @@ func reorderPages( to, from int ) int {
     return to
 }
 
-func getWorkAreaPage( pageNumber int ) *page {
+func getWorkAreaPageByNumber( pageNumber int ) *page {
     if pageNumber >= len(mainArea.pages) {
-        log.Panicln("Notebook page number out of range")
+        log.Panicln("getWorkAreaPageByNumber: page number out of range")
     }
     return mainArea.pages[pageNumber]
 }
 
+func getCurrentWorkAreaPageNumber( ) int {
+    return mainArea.notebook.GetCurrentPage()
+}
+
 func getCurrentWorkAreaPage( ) *page {
-    pageNumber := mainArea.notebook.GetCurrentPage()
+    pageNumber := getCurrentWorkAreaPageNumber()
     if -1 == pageNumber {
         return nil
     }
-    return getWorkAreaPage( pageNumber )
+    return getWorkAreaPageByNumber( pageNumber )
 }
 
 func getCurrentWorkAreaPageContext( ) *pageContext {
     pg := getCurrentWorkAreaPage()
-    if nil == pg {
-        return nil
+    if nil != pg {
+        return pg.getContext()
     }
-    return pg.context
+    return nil
 }
 
 func saveCurrentPage( ) {
     pg := getCurrentWorkAreaPage( )
     if pg == nil {
-        log.Panicln("No notebook page available")
+        log.Panicln("saveCurrentPage: No page available")
     }
-    if pg.path == "" {
-        saveCurrentPageAs( )
-    } else {
-        savePageContentAs( pg.path )
-    }
+    pg.save( )
 }
 
 func saveCurrentPageAs( ) {
-    pathName := saveFileName( )
-    if pathName != "" {
-        log.Printf( "saveCurrentPageAs: file %s\n", pathName )
-        err := savePageContentAs( pathName )
-        if err != nil {
-            errorDisplay( "Unable to save file %s (%v)", pathName, err )
-        } else {
-            pg := getCurrentWorkAreaPage( )
-            pg.path = pathName
-            name := filepath.Base( pathName )
-            pg.label.SetText(name)
-            fileExists( true )
-        }
+    pg := getCurrentWorkAreaPage( )
+    if pg == nil {
+        log.Panicln("saveCurrentPageAs: No page available")
     }
+    pg.saveAs( )
 }
 
 func revertCurrentPage( ) {
     pg := getCurrentWorkAreaPage( )
     if pg == nil {
-        log.Panicln("No notebook page available")
+        log.Panicln("revertCurrentPage: No page available")
     }
-    if pg.path != "" {
-        reloadPageContent( pg.path )
+    if "" != pg.getPath() {
+        pc := pg.getContext( )
+        pc.reloadContent( pg.path )
     }
 }
 
-func removeCurrentPage( ) {
-    pageNumber := mainArea.notebook.GetCurrentPage()
-    mainArea.removePage( pageNumber )
+func closePageNumber( pageNumber int ) {
+    pg := getWorkAreaPageByNumber( pageNumber )
+    if pg == nil {
+        log.Panicln("closePageNumber: page number out of range")
+    }
+    pg.remove( pageNumber )
 }
 
-//func closePage( pg int )
 func closeCurrentPage( ) {
-    pc := getCurrentWorkAreaPageContext( )
-
-    if pc != nil && pc.isPageModified() {
-        switch closeFileDialog() {
-        case CANCEL:
-            return
-        case SAVE_THEN_DO:
-            saveCurrentPage( )
-        case DO:
-        }
-        removeCurrentPage( )
+    pageNumber := getCurrentWorkAreaPageNumber( )
+    if -1 == pageNumber {
+        log.Panicln("closeCurrentPage: No page available")
     }
+    closePageNumber( pageNumber )
 }
 
 func showWindow() {
@@ -261,11 +312,9 @@ func (wa *workArea)removePage( pageIndex int ) {
 }
 
 func closeTab( pg *page ) bool {
-    for i, p := range mainArea.pages {
+    for pn, p := range mainArea.pages {
         if pg == p {
-            log.Printf( "CloseTab: Page number %d (label %s, path <%s>)\n",
-                        i, pg.label.GetLabel(), p.path )
-            mainArea.removePage(i)
+            closePageNumber( pn )
             break
         }
     }
@@ -484,8 +533,11 @@ func newStatusArea( ) *gtk.Box {
 }
 
 func exitApplication( win *gtk.Window ) bool {
-    gtk.MainQuit()
-    return false
+    if removeAllPages( ) {
+        gtk.MainQuit()
+        return false
+    }
+    return true
 }
 
 // called when mouse button clicked on page
