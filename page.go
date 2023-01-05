@@ -964,7 +964,8 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
 
     printDebug( "drawDataLines: address=%d, stop=%d, dataLen=%d, lineYPos=%f\n",
                  address, stop, dataLen, lineYPos )
-    cw, ch, _ := getCharSizes( )
+    vSepSpan := getInt64Preference( VER_SEP_SPAN )
+    cw, ch, cd := getCharSizes( )
     for {
         cr.MoveTo( 0.0, lineYPos )
         setAddForegroundColor( cr )
@@ -1006,16 +1007,28 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
         if address > stop {
             break
         }
+        if vSepSpan > 0 {
+            startLine ++
+            if startLine > 0 && startLine % vSepSpan == 0 {
+                xStart := float64(cw) * (float64(pc.addLen) + 0.5)
+                xStop := xStart + float64( 3 * pc.nBytesLine * cw )
+                yPos := lineYPos + float64( cd )
+                setSeparatorColor( cr )
+                cr.MoveTo( xStart, yPos )
+                cr.LineTo( xStop , yPos )
+                cr.Stroke( )
+            }
+        }
         lineYPos += float64(ch)
     }
 
-    sepSpan := getIntPreference( HOR_SEP_SPAN )
-    if sepSpan > 0 && sepSpan <= pc.nBytesLine {
+    hSepSpan := getIntPreference( HOR_SEP_SPAN )
+    if hSepSpan > 0 && hSepSpan <= pc.nBytesLine {
         xStart := float64(cw) * (float64(pc.addLen) + 0.5)
-        xInc := float64(3 * sepSpan * cw)
+        xInc := float64(3 * hSepSpan * cw)
         cr.SetLineWidth( 2.0 )
         setSeparatorColor( cr )
-        for i := 0; i <= nBL; i += sepSpan {
+        for i := 0; i <= nBL; i += hSepSpan {
             cr.MoveTo( xStart, 0.0 )
             cr.LineTo( xStart, lineYPos )
             cr.Stroke( )
