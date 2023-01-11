@@ -88,9 +88,6 @@ const (
     menuEditPreferences
     menuEditPreferencesHelp
 
-    menuEditLanguage
-    menuEditLanguageHelp
-
     menuSearchFind
     menuSearchFindHelp
 
@@ -109,9 +106,8 @@ const (
     windowTitlePreferences
     windowTitleExplore
 
+    dialogPreferencesDisplayTab
     dialogPreferencesEditorTab
-    dialogPreferencesSaveTab
-    dialogPreferencesThemeTab
 
     dialogPreferencesFont
     dialogPreferencesFontName
@@ -127,17 +123,19 @@ const (
 
     dialogPreferencesEditor
     dialogPreferencesEditorReadOnly
-    dialogPreferencesEditorReplaceNode
+    dialogPreferencesEditorReplaceMode
 
     dialogPreferencesSearch
     dialogPreferencesSearchWrapAround
-    dialogPreferencesSearchShowAsciiReplace
 
     dialogPreferencesSave
     dialogPreferencesSaveBackup
 
     dialogPreferencesTheme
     dialogPreferencesThemeName
+
+    dialogPreferencesLanguage
+    dialogPreferencesLanguageName
 
     dialogExploreBitStream
     dialogExploreBitStreamFirstBit
@@ -214,6 +212,53 @@ const (
 
 var languages [languageNumber]string = [languageNumber]string {
     "American English", "Français",
+}
+
+func getLanguageNames() []string {
+    return languages[:]
+}
+
+var currentLanguageId  int = 0
+
+func selectLanguage( languageId int ) {
+    if languageId >= languageNumber {
+        log.Fatalf( "selectLanguage: language index out of range: %d (range 0-%d)\n",
+                    languageId, languageNumber-1 )
+    }
+    if currentLanguageId != languageId {
+        log.Printf( "selectLanguage: change from %s to %s\n",
+                    languages[currentLanguageId], languages[languageId] )
+        currentLanguageId = languageId
+    }
+}
+
+func getSelectedLanguage( ) int {
+    return currentLanguageId
+}
+
+func setLanguage( languageName string ) {
+    for i := 0; i < languageNumber; i ++ {
+        if languageName == languages[i] {
+            currentLanguageId = i
+            return
+        }
+    }
+    log.Fatalf( "initResources: unknown language %s\n", languageName )
+}
+
+func updateLanguage( prefName string ) {
+    language := getStringPreference( prefName )
+    setLanguage( language )
+    refreshMenus( )
+    refreshPageStatus( )
+    refreshDialogs( )
+    refreshSearchArea( )
+}
+
+func initResources( ) {
+    registerForChanges( LANGUAGE_NAME, updateLanguage )
+    language := getStringPreference( LANGUAGE_NAME )
+    setLanguage( language )
 }
 
 var englishRes [arrayLength]string = [arrayLength]string {
@@ -294,9 +339,6 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Preferences",                                          // menuEditPreferences
     "setup preferences",                                    // menuEditPreferencesHelp
 
-    "Language",                                             // menuEditLanguage
-    "select UI language",                                   // menuEditLanguageHelp
-
     "Find",                                                 // menuSearchFind
     "Find a given hex string in file",                      // menuSearchFindHelp
 
@@ -315,9 +357,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Preferences",                                          // windowTitlePreferences
     "Explore",                                              // windowTitleExplore
 
+    "Display",                                              // dialogPreferencesDisplayTab
     "Editor",                                               // dialogPreferencesEditorTab
-    "Save",                                                 // dialogPreferencesSaveTab
-    "Theme",                                                // dialogPreferencesThemeTab
 
     "Font",                                                 // dialogPreferencesFont
     "Family Name",                                          // dialogPreferencesFontName
@@ -333,17 +374,19 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Editor",                                               // dialogPreferencesEditor
     "Start in Read Only mode",                              // dialogPreferencesEditorReadOnly
-    "Start in replace mode",                                // dialogPreferencesEditorReplaceNode
+    "Start in replace mode",                                // dialogPreferencesEditorReplaceMode
 
     "Search",                                               // dialogPreferencesSearch
     "Start in wrap around mode",                            // dialogPreferencesSearchWrapAround
-    "show replace bytes as ASCII too",                      // dialogPreferencesSearchShowAsciiReplace
 
     "Updating",                                             // dialogPreferencesSave
     "Create a backup file before saving",                   // dialogPreferencesSaveBackup
 
     "Theme",                                                // dialogPreferencesTheme
     "Select name",                                          // dialogPreferencesThemeName
+
+    "Language",                                             // dialogPreferencesLanguage
+    "User Interface Language",                              // dialogPreferencesLanguageName
 
     "Bitstream",                                            // dialogExploreBitStream
     "First Bit",                                            // dialogExploreBitStreamFirstBit
@@ -403,8 +446,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
-    "Enter hex string to find ",                             // findPrompt
-    " replacement Hex string ",                             // replacePrompt
+    " Enter hex string to find ",                            // findPrompt
+    "Replacement Hex string ",                              // replacePrompt
 
     "Save before closing?",                                 // dialogCloseTitle
     "Go to byte",                                           // dialogGotoTitle
@@ -415,7 +458,7 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "document sans nom",                                    // emptyFile
 
-    "VUE",                                                  // textReadOnly
+    "LEC",                                                  // textReadOnly
     "MOD",                                                  // textReadWrite
 
     "INS",                                                  // textInsertMode
@@ -429,15 +472,15 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "copier la valeur",                                     // actionCopyValue
 
     "_Fichier",                                             // menuFile / prefix with '_' for menu shortcut
-    "_Edit",                                                // menuEdit
-    "_Rechercher",                                          // menuSearch
+    "_Edition",                                             // menuEdit
+    "_Recherche",                                           // menuSearch
     "_Aide",                                                // menuHelp
 
     "Nouveau",                                              // menuFileNew
     "crée un nouveau fichier",                              // menuFileNewHelp
 
     "Ouvrir",                                               // menuFileOpen
-    "Ouvrir un fichier dans la page courante",              // menuFileOpenHelp
+    "ouvre un fichier dans une nouvelle page",              // menuFileOpenHelp
 
     "Enregistrer",                                          // menuFileSave
     "enregistre le fichier courant",                        // menuFileSaveHelp
@@ -460,10 +503,10 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Refaire",                                              // menuEditRedo
     "répete la précedente commande annullée",               // menuEditRedoHelp
 
-    "Passe en mode Lecture",                                // menuEditFreeze
+    "Passer en mode Lecture",                               // menuEditFreeze
     "Empèche la modification accidentelle du fichier",      // menuEditFreezeHelp
 
-    "Passe en mode Modification",                           // menuEditModify
+    "Passer en mode Modification",                          // menuEditModify
     "Permet la modification du fichier",                    // menuEditModifyHelp
 
     "couper",                                               // menuEditCut
@@ -487,9 +530,6 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Préférences",                                          // menuEditPreferences
     "configure l'application",                              // menuEditPreferencesHelp
 
-    "Language",                                             // menuEditLanguage
-    "choisit le language",                                  // menuEditLanguageHelp
-
     "Trouver",                                              // menuSearchFind
     "Trouve la séquence hexadécimale dans le fichier",      // menuSearchFindHelp
 
@@ -508,9 +548,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Préférences",                                          // windowTitlePreference
     "Explorer",                                             // windowTitleExplore
 
+    "Presentation",                                         // dialogPreferecnesDisplayTab
     "Editeur",                                              // dialogPreferencesEditorTab
-    "Enregistrer",                                          // dialogPreferencesSaveTab
-    "Thème",                                                // dialogPreferencesThemeTab
 
     "Police",                                               // dialogPreferencesFont
     "Famille",                                              // dialogPreferencesFontName
@@ -526,17 +565,19 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Editeur",                                              // dialogPreferencesEditor
     "Démarrer en mode protéger",                            // dialogPreferencesEditorReadOnly
-    "Démarrer en mode remplacer",                           // dialogPreferencesEditorReplaceNode
+    "Démarrer en mode remplacer",                           // dialogPreferencesEditorReplaceMode
 
     "Chercher",                                             // dialogPreferencesSearch
     "Démarrer en mode circulaire",                          // dialogPreferencesSearchWrapAround
-    "Présenter les octets de remplacement en texte",        // dialogPreferencesSearchShowAsciiReplace
 
     "Mise à jour",                                          // dialogPreferencesSave
     "Sauvegarder le ficher avant d'enregister",             // dialogPreferencesSaveBackup
 
     "Thème",                                                // dialogPreferencesTheme
     "Choisissez le thème",                                  // dialogPreferencesThemeName
+
+    "Langue",                                               // dialogPreferencesLanguage
+    "Langue de l'interface utilisateur",                    // dialogPreferencesLanguageName
 
     "Chaine de bits",                                       // dialogExploreBitStream
     "Premier bit",                                          // dialogExploreBitStreamFirstBit
@@ -547,8 +588,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "en dernier",                                           // dialogExploreBitStreamMSBLast
 
     "Binaire",                                              // dialogExploreBitStreamBinary
-    "Hexdecimale",                                          // dialogExploreHexa
-    "Octale",                                               // dialogExploreOctal
+    "Hexdecimal",                                           // dialogExploreHexa
+    "Octal",                                                // dialogExploreOctal
 
     "Signé",                                                // dialogExploreSigned
     "Non-signé",                                            // dialogExploreUnsigned
@@ -559,15 +600,14 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Petit-boutiste",                                       // dialogExploreEndianLittle
 
     "Entier",                                               // dialogExploreInt
-    "Reél",                                                 // dialogExploreReal
-
     "8 bits",                                               // dialogExploreInt8
     "16 bits",                                              // dialogExploreInt16
     "32 bits",                                              // dialogExploreInt32
     "64 bits",                                              // dialogExploreInt64
 
-    "float 32",                                             // dialogExploreFloat32
-    "float 64",                                             // dialogExploreFloat64
+    "Reél",                                                 // dialogExploreReal
+    "flottant 32",                                          // dialogExploreFloat32
+    "flottant 64",                                          // dialogExploreFloat64
 
     "Oui",                                                  // buttonOk
     "Annuler",                                              // buttonCancel
@@ -597,8 +637,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Si vous fermez sans enregister, toutes les modifications seront perdues",  // warningCloseFile
     "Entrez l'adresse de l'octet en hexadecimal",           // gotoPrompt
-    "Chercher les characteres hexa",                        // findPrompt
-    " Replacer avec la chaine hexa",                        // replacePrompt
+    " Chercher les characteres hexa",                        // findPrompt
+    "Remplacer avec la chaine hexa",                        // replacePrompt
 
     "Enregistrer avant de Fermer ?",                        // dialogCloseTitle
     "Aller à",                                              // dialogGotoTitle
@@ -606,29 +646,6 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
 var textResources [languageNumber]*[arrayLength]string  = [languageNumber]*[arrayLength]string { 
     &englishRes, &frenchRes,
-}
-
-var currentLanguageId  int = 0
-
-func selectLanguage( languageId int ) {
-    if languageId >= languageNumber {
-        log.Fatalf( "SelectLanguage: language index out of range: %d (range 0-%d)\n",
-                    languageId, languageNumber-1 )
-    }
-    if currentLanguageId != languageId {
-        log.Printf( "SelectLanguage: change from %s to %s\n",
-                    languages[currentLanguageId], languages[languageId] )
-        currentLanguageId = languageId
-    }
-}
-
-func getSelectedLanguage( ) int {
-    return currentLanguageId
-}
-
-func getSupportedLanguages( ) *[]string {
-    res := languages[:]
-    return &res
 }
 
 func localizeText( textId int ) string {

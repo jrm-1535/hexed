@@ -84,8 +84,6 @@ func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
             false, -1, -1, -1, -1 },
         { "preferences", accelCode{ 0, 0, 0 },
             true, menuEditPreferences, menuEditPreferencesHelp, -1, -1 },
-        { "language", accelCode{ 0, 0, 0 },
-            true, menuEditLanguage, menuEditLanguageHelp, -1, -1 },
     }
     nItems += len(editMenuDef)
 

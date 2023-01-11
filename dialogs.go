@@ -178,10 +178,22 @@ func changed( name string, val interface{} ) {
     update( pref )
 }
 
-func getPreferenceDialogEditorDef( ) *boxDef {
-    separator := headerDef { " ", 0, 0 }
-    fontHeader := headerDef { localizeText(dialogPreferencesFont), 5, 10 }
-    var fontNames = [...]string{ "Courier 10 Pitch", "Monospace" }
+const (
+    FONT_HEADER = "font"
+    DISPLAY_HEADER = "display"
+    THEME_HEADER = "theme"
+    EDITOR_HEADER = "editor"
+    LANGUAGE_HEADER = "language"
+    SAVE_HEADER = "save"
+    SEARCH_HEADER = "search"
+)
+
+func getPreferenceDialogDisplayDef( ) *boxDef {
+
+    separator := headerDef { " ", "", 0, 0 }
+    fontHeader := headerDef { localizeText(dialogPreferencesFont),
+                              FONT_HEADER, 5, 10 }
+    var fontNames = [...]string{ "Courier 10 Pitch", "Liberation Mono", "Monospace" }
     fontName := contentDef { localizeText(dialogPreferencesFontName),
                              nil, FONT_NAME,
                              getStringPreference(FONT_NAME), fontNames[0:],
@@ -191,7 +203,8 @@ func getPreferenceDialogEditorDef( ) *boxDef {
                              getIntPreference(FONT_SIZE), inputCtl{ 9, 25, 2 },
                              changed, 20 }
 
-    displayHeader := headerDef { localizeText(dialogPreferencesDisplay), 5, 10 }
+    displayHeader := headerDef { localizeText(dialogPreferencesDisplay),
+                                 DISPLAY_HEADER, 5, 10 }
     minBytesLine := contentDef { localizeText(dialogPreferencesDisplayMinBytesLine),
                                 nil, MIN_BYTES_LINE,
                                 getIntPreference(MIN_BYTES_LINE), inputCtl{ 8, 32, 4 },
@@ -213,61 +226,124 @@ func getPreferenceDialogEditorDef( ) *boxDef {
                                 getIntPreference(VER_SEP_SPAN), inputCtl{ 0, 32, 8 },
                                 changed, 20 }
 
-    editorHeader := headerDef { localizeText(dialogPreferencesEditor), 5, 10 }
-    startReadOnly := contentDef { localizeText(dialogPreferencesEditorReadOnly),
-                                nil, START_READ_ONLY,
-                                getBoolPreference(START_READ_ONLY), nil, changed, 20 }
-    startReplace := contentDef { localizeText(dialogPreferencesEditorReplaceNode),
-                                nil, START_REPLACE_MODE,
-                                getBoolPreference(START_REPLACE_MODE), nil,
-                                changed, 20 }
-
-    searchHeader := headerDef { localizeText(dialogPreferencesSearch), 5, 10 }
-    wrapAround := contentDef { localizeText(dialogPreferencesSearchWrapAround),
-                                nil, WRAP_MATCHES,
-                                getBoolPreference(WRAP_MATCHES), nil,
-                                changed, 20 }
-
-    return &boxDef { 5, 0, false, "", VERTICAL, []interface{} {
-                     &displayHeader, &minBytesLine, &maxBytesLine,
-                     &BytesLineInc, &ByteSeparator, &LineSeparator,
-                     &fontHeader, &fontName, &fontSize,
-                     &editorHeader, &startReadOnly, &startReplace,
-                     &searchHeader, &wrapAround, &separator } }
-}
-
-func getPreferenceDialogSaveDef( ) *boxDef {
-
-    saveHeader := headerDef { localizeText(dialogPreferencesSave), 5, 10 }
-    backup := contentDef { localizeText(dialogPreferencesSaveBackup),
-                           nil, CREATE_BACKUP_FILES,
-                           getBoolPreference(CREATE_BACKUP_FILES), nil,
-                           changed, 20 }
-    return &boxDef { 15, 5, false, "", VERTICAL, []interface{} {
-                                                    &saveHeader, &backup } }
-}
-
-func getPreferenceDialogTheme( ) *boxDef {
-
     themeNames, err := getThemeNames( )
     if err != nil {
         log.Fatalf( "Unable to get any theme name: %v\n", err )
     }
 
-    themeHeader := headerDef { localizeText(dialogPreferencesTheme), 5, 10 }
+    themeHeader := headerDef { localizeText(dialogPreferencesTheme),
+                               THEME_HEADER, 5, 10 }
     themeName := contentDef { localizeText(dialogPreferencesThemeName),
                               nil, COLOR_THEME_NAME,
                               getStringPreference(COLOR_THEME_NAME), themeNames,
                               changed, 20 }
-    return &boxDef { 15, 5, false, "", VERTICAL, []interface{} {
-                                                &themeHeader, &themeName } }
+
+    return &boxDef { 5, 0, false, "", "", VERTICAL, []interface{} {
+                     &displayHeader, &minBytesLine, &maxBytesLine,
+                     &BytesLineInc, &ByteSeparator, &LineSeparator,
+                     &fontHeader, &fontName, &fontSize,
+                     &themeHeader, &themeName, &separator } }
+}
+
+func updatePreferenceDialogDisplayLanguage( db *dataBox ) {
+
+    db.setLabel( FONT_HEADER, localizeText(dialogPreferencesFont) )
+    db.setLabel( FONT_NAME, localizeText(dialogPreferencesFontName) )
+    db.setLabel( FONT_SIZE, localizeText(dialogPreferencesFontSize) )
+
+    db.setLabel( DISPLAY_HEADER, localizeText(dialogPreferencesDisplay) )
+    db.setLabel( MIN_BYTES_LINE, localizeText(dialogPreferencesDisplayMinBytesLine) )
+    db.setLabel( MAX_BYTES_LINE, localizeText(dialogPreferencesDisplayMaxBytesLine) )
+    db.setLabel( LINE_BYTE_INC, localizeText(dialogPreferencesDisplayLineIncrement) )
+    db.setLabel( HOR_SEP_SPAN, localizeText(dialogPreferencesDisplayBytesSeparator) )
+    db.setLabel( VER_SEP_SPAN, localizeText(dialogPreferencesDisplayLinesSeparator) )
+
+    db.setLabel( THEME_HEADER, localizeText(dialogPreferencesTheme) )
+    db.setLabel( COLOR_THEME_NAME, localizeText(dialogPreferencesThemeName) )
+}
+
+func getPreferenceDialogEditorDef( ) *boxDef {
+
+    separator := headerDef { " ", "", 0, 0 }
+    editorHeader := headerDef { localizeText(dialogPreferencesEditor),
+                                EDITOR_HEADER, 5, 10 }
+    startReadOnly := contentDef { localizeText(dialogPreferencesEditorReadOnly),
+                                nil, START_READ_ONLY,
+                                getBoolPreference(START_READ_ONLY), nil, changed, 20 }
+    startReplace := contentDef { localizeText(dialogPreferencesEditorReplaceMode),
+                                nil, START_REPLACE_MODE,
+                                getBoolPreference(START_REPLACE_MODE), nil,
+                                changed, 20 }
+
+    languageHeader := headerDef { localizeText(dialogPreferencesLanguage),
+                                  LANGUAGE_HEADER, 5, 10 }
+    languageNames := getLanguageNames( )
+    languageName := contentDef { localizeText(dialogPreferencesLanguageName),
+                                 nil, LANGUAGE_NAME,
+                                 getStringPreference(LANGUAGE_NAME), languageNames,
+                                 changed, 20 }
+
+    saveHeader := headerDef { localizeText(dialogPreferencesSave),
+                              SAVE_HEADER, 5, 10 }
+    backup := contentDef { localizeText(dialogPreferencesSaveBackup),
+                           nil, CREATE_BACKUP_FILES,
+                           getBoolPreference(CREATE_BACKUP_FILES), nil,
+                           changed, 20 }
+
+    searchHeader := headerDef { localizeText(dialogPreferencesSearch),
+                                SEARCH_HEADER, 5, 10 }
+    wrapAround := contentDef { localizeText(dialogPreferencesSearchWrapAround),
+                               nil, WRAP_MATCHES,
+                               getBoolPreference(WRAP_MATCHES), nil,
+                               changed, 20 }
+
+    return &boxDef { 5, 0, false, "", "", VERTICAL, []interface{} {
+                     &languageHeader, &languageName,
+                     &editorHeader, &startReadOnly, &startReplace,
+                     &saveHeader, &backup,
+                     &searchHeader, &wrapAround, &separator } }
+}
+
+func updatePreferenceDialogEditorLanguage( db *dataBox ) {
+
+    db.setLabel( EDITOR_HEADER, localizeText(dialogPreferencesEditor) )
+    db.setLabel( START_READ_ONLY, localizeText(dialogPreferencesEditorReadOnly) )
+    db.setLabel( START_REPLACE_MODE, localizeText(dialogPreferencesEditorReplaceMode) )
+
+    db.setLabel( LANGUAGE_HEADER, localizeText(dialogPreferencesLanguage) )
+    db.setLabel( LANGUAGE_NAME, localizeText(dialogPreferencesLanguageName) )
+
+    db.setLabel( SAVE_HEADER, localizeText(dialogPreferencesSave) )
+    db.setLabel( CREATE_BACKUP_FILES, localizeText(dialogPreferencesSaveBackup) )
+
+    db.setLabel( SEARCH_HEADER, localizeText(dialogPreferencesSave) )
+    db.setLabel( WRAP_MATCHES, localizeText(dialogPreferencesSearch) )
+}
+
+type preferenceDialogPage struct {
+    dBox            *dataBox
+    updateLanguage  func( db *dataBox )
+    tabId           int
 }
 
 type preferenceNotebook struct {
-    *gtk.Notebook
+            *gtk.Notebook
+    pages   []preferenceDialogPage
+}
+
+func (pn *preferenceNotebook) refreshLanguage( ) {
+    for i, pg := range pn.pages {
+        npg, err := pn.Notebook.GetNthPage( i )
+        if err != nil {
+            log.Fatalf( "refreshLanguage: unable to get preference page %d\n", i )
+        }
+        pn.Notebook.SetTabLabelText( npg, localizeText( pg.tabId ) )
+        pg.updateLanguage( pg.dBox)
+    }
 }
 
 func (pn *preferenceNotebook) appendPreferencePage( bdef *boxDef,
+                                                    updateLanguage func( db *dataBox ),
                                                     tabId int ) {
 
     dbox := makeDataBox( bdef )
@@ -278,7 +354,11 @@ func (pn *preferenceNotebook) appendPreferencePage( bdef *boxDef,
     if pageIndex := pn.AppendPage( dbox.Frame, tab ); -1 == pageIndex {
         log.Fatalf( "appendPreferencePage: Unable to append page\n" )
     }
+    pn.pages = append( pn.pages,
+                       preferenceDialogPage{ dbox, updateLanguage, tabId } )
 }
+
+var preferenceDialog *preferenceNotebook
 
 func showPreferencesDialog( ) {
     dialog, err := gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
@@ -295,12 +375,14 @@ func showPreferencesDialog( ) {
     prefNB.Notebook.SetTabPos( gtk.POS_LEFT )
     dialog.Add( prefNB.Notebook )
 
+    displayDef := getPreferenceDialogDisplayDef( )
+    prefNB.appendPreferencePage( displayDef,
+                                 updatePreferenceDialogDisplayLanguage,
+                                 dialogPreferencesDisplayTab )
     editorDef := getPreferenceDialogEditorDef( )
-    prefNB.appendPreferencePage( editorDef, dialogPreferencesEditorTab )
-    saveDef := getPreferenceDialogSaveDef( )
-    prefNB.appendPreferencePage( saveDef, dialogPreferencesSaveTab )
-    themeDef := getPreferenceDialogTheme( )
-    prefNB.appendPreferencePage( themeDef, dialogPreferencesThemeTab )
+    prefNB.appendPreferencePage( editorDef,
+                                 updatePreferenceDialogEditorLanguage,
+                                 dialogPreferencesEditorTab )
 
     dialog.SetTransientFor( window )
     dialog.SetTypeHint( gdk.WINDOW_TYPE_HINT_DIALOG )
@@ -310,12 +392,20 @@ func showPreferencesDialog( ) {
 
     dialog.Connect( "delete-event", cleanPreferencesDialog )
     enablePreferences( false )
+    preferenceDialog = prefNB
     dialog.ShowAll()
 }
 
 func cleanPreferencesDialog( pd *gtk.Window ) bool {
+    preferenceDialog = nil
     enablePreferences( true )
     return false
+}
+
+func refreshPreferencesDialogLanguage( ) {
+    if preferenceDialog != nil {
+        preferenceDialog.refreshLanguage( )
+    }
 }
 
 // --- explore dialog
@@ -381,27 +471,40 @@ func (exp *explore)getBitStreamString( base int, signed bool ) (t string, ok boo
 
 func (exp *explore)updateValue( base int, signed bool, name string ) {
     if text, ok := exp.getBitStreamString( base, signed ); ok {
-        setTextContent( exp.dataBox, name, text )
+        exp.dataBox.setTextValue( name, text )
     }
 }
+
+const (
+    BITSTREAM_HEADER = "bitstream"
+
+    FIRST_BIT = "first_bit"
+    NUMBER_BITS = "number_bits"
+
+    BINARY_VALUE = "binary_value"
+    OCTAL_VALUE = "octal_value"
+    HEXA_VALUE = "hexa_value"
+    UNSIGNED_DECIMAL = "unsigned_decimal"
+    SIGNED_DECIMAL = "signed_decimal"
+)
 
 func (exp *explore)updateBitStream( ) {
 
     exp.makeBitStream( )
-    setTextContent( exp.dataBox, "BINARY_VALUE", exp.bitStream )
+    exp.dataBox.setTextValue( BINARY_VALUE, exp.bitStream )
 
-    exp.updateValue( 8, false, "OCTAL_VALUE" )
-    exp.updateValue( 16, false, "HEXA_VALUE" )
+    exp.updateValue( 8, false, OCTAL_VALUE )
+    exp.updateValue( 16, false, HEXA_VALUE )
 
-    exp.updateValue( 10, true, "SIGNED_VALUE" )
-    exp.updateValue( 10, false, "UNSIGNED_VALUE" )
+    exp.updateValue( 10, true, SIGNED_DECIMAL )
+    exp.updateValue( 10, false, UNSIGNED_DECIMAL )
 }
 
 func (exp *explore)updateFirstBit( firstBit int ) {
     bitLen := len(exp.data) << 3
     if firstBit + exp.nBits > bitLen {
         exp.nBits = bitLen - firstBit
-        setIntContent( exp.dataBox, "NUMBER_BITS", exp.nBits )
+        exp.dataBox.setIntValue( NUMBER_BITS, exp.nBits )
     }
     exp.firstBit = firstBit
     exp.updateBitStream()
@@ -411,10 +514,43 @@ func (exp *explore)updateNBits( nBits int ) {
     bitLen := len(exp.data) << 3
     if exp.firstBit + nBits > bitLen {
         exp.firstBit = bitLen - nBits
-        setIntContent( exp.dataBox, "FIRST_BIT", exp.firstBit )
+        exp.dataBox.setIntValue( FIRST_BIT, exp.firstBit )
     }
     exp.nBits = nBits
     exp.updateBitStream()
+}
+
+func (exp *explore)getBitOrderControl( ) (bitOrderNames []string,
+                                          bitOrder int,
+                                          bitOrderChanged func(
+                                                     string, interface{} )) {
+    bitOrderNames = make( []string, 2 )
+    bitOrderNames[0] = localizeText(dialogExploreBitStreamMSBFirst)
+    bitOrderNames[1] = localizeText(dialogExploreBitStreamMSBLast)
+
+    if getBoolPreference(BITSTREAM_MSBF) == true {
+        exp.msbFirst = true
+        bitOrder = 0
+    } else {
+        exp.msbFirst = false
+        bitOrder = 1
+    }
+
+    bitOrderChanged = func( name string, val interface{} ) {
+        pref := preferences{}
+        orderName := val.(string)
+        // localize in case language has changed in the meantime
+        if orderName == localizeText(dialogExploreBitStreamMSBFirst) {
+            exp.msbFirst = true
+            pref[name] = true
+        } else {
+            exp.msbFirst = false
+            pref[name] = false
+        }
+        update( pref )
+        exp.updateBitStream( )
+    }
+    return
 }
 
 func getBitStreamCtlBox( exp *explore, firstBit int ) *boxDef {
@@ -449,36 +585,22 @@ func getBitStreamCtlBox( exp *explore, firstBit int ) *boxDef {
     }
 
     shift := contentDef { localizeText(dialogExploreBitStreamFirstBit),
-                          nil, "FIRST_BIT", firstBit,
+                          nil, FIRST_BIT, firstBit,
                           inputCtl{ 0, maxFirstBit, 1 }, shiftChanged, 0 }
 
     nBitsChanged := func( name string, val interface{} ) {
         exp.updateNBits( int(val.(float64)) )
     }
     nBits := contentDef { localizeText(dialogExploreBitStreamNumberBits),
-                          nil, "NUMBER_BITS", n,
+                          nil, NUMBER_BITS, n,
                           inputCtl{ 1, maxNBits, 1 }, nBitsChanged, 0 }
 
-    var bitOrderNames [2]string
-    bitOrderNames[0] = localizeText(dialogExploreBitStreamMSBFirst)
-    bitOrderNames[1] = localizeText(dialogExploreBitStreamMSBLast)
-
-    bitOrderChanged := func( name string, val interface{} ) {
-        bitOrderName := val.(string)
-        if bitOrderName == bitOrderNames[0] {
-            exp.msbFirst = true
-        } else {
-            exp.msbFirst = false
-        }
-        exp.updateBitStream( )
-    }
-
-    exp.msbFirst = true     // default
+    orderNames,order, orderChanged := exp.getBitOrderControl( )
     bitOrder := contentDef { localizeText(dialogExploreBitStreamMSB), nil,
-                             "BIT_ORDER", bitOrderNames[0],
-                             bitOrderNames[0:], bitOrderChanged, 0 }
+                             BITSTREAM_MSBF, orderNames[order],
+                             orderNames, orderChanged, 0 }
 
-    return &boxDef { 18, 20, false, "", HORIZONTAL, []interface{} {
+    return &boxDef { 18, 20, false, "", "", HORIZONTAL, []interface{} {
                      &shift, &nBits, &bitOrder } }
 }
 
@@ -500,31 +622,35 @@ func getBitStreamBox( exp *explore, firstBit int ) *boxDef {
 
     bitStreamCtl := constCtl{ LEFT_ALIGN, 0, true, true, true }
     bitStreamBinary := contentDef { localizeText(dialogExploreBitStreamBinary),
-                                    nil, "BINARY_VALUE",
+                                    nil, BINARY_VALUE,
                                     exp.bitStream, bitStreamCtl, nil, 0 }
-    bitStreamBinaryBox := boxDef { 18, 20, false, "", HORIZONTAL, []interface{} {
-                                                     &bitStreamBinary } }
+    bitStreamBinaryBox := boxDef { 18, 20, false, "", "", HORIZONTAL,
+                                   []interface{} { &bitStreamBinary } }
 
     if ok {
         bitStreamOctal := contentDef { localizeText(dialogExploreOctal),
-                                       nil, "OCTAL_VALUE", octal, bitStreamCtl, nil, 0 }
+                                       nil, OCTAL_VALUE, octal, bitStreamCtl, nil, 0 }
         bitStreamHexa := contentDef { localizeText(dialogExploreHexa),
-                                       nil, "HEXA_VALUE", hexa, bitStreamCtl, nil, 0 }
-        bitStreamOH := boxDef{ 10, 20, false, "", HORIZONTAL, []interface{} {
+                                       nil, HEXA_VALUE, hexa, bitStreamCtl, nil, 0 }
+        bitStreamOH := boxDef{ 10, 20, false, "", "", HORIZONTAL, []interface{} {
                                &bitStreamOctal, &bitStreamHexa } }
 
         bitStreamUnsigned := contentDef { localizeText(dialogExploreUnsigned),
-                                        nil, "UNSIGNED_VALUE", unsigned, bitStreamCtl, nil, 0 }
+                                        nil, UNSIGNED_DECIMAL,
+                                        unsigned, bitStreamCtl, nil, 0 }
         bitStreamSigned := contentDef { localizeText(dialogExploreSigned),
-                                        nil, "SIGNED_VALUE", signed, bitStreamCtl, nil, 0 }
-        bitStreamDecimal := boxDef{ 10, 20, false, "", HORIZONTAL, []interface{} {
+                                        nil, SIGNED_DECIMAL,
+                                        signed, bitStreamCtl, nil, 0 }
+        bitStreamDecimal := boxDef{ 10, 20, false, "", "", HORIZONTAL, []interface{} {
                                     &bitStreamUnsigned, &bitStreamSigned } }
 
-        return &boxDef { 10, 10, true, bitStreamTitle, VERTICAL, []interface{} {
+        return &boxDef { 10, 10, true, bitStreamTitle, BITSTREAM_HEADER,
+                         VERTICAL, []interface{} {
                          bitStreamCtlBox, &bitStreamBinaryBox, &bitStreamOH,
-                         &bitStreamDecimal, &headerDef { " ", 0, 0 } } }
+                         &bitStreamDecimal, &headerDef { " ", "", 0, 0 } } }
     } else  {
-        return &boxDef { 10, 10, true, bitStreamTitle, VERTICAL, []interface{} {
+        return &boxDef { 10, 10, true, bitStreamTitle, BITSTREAM_HEADER,
+                         VERTICAL, []interface{} {
                          bitStreamCtlBox, &bitStreamBinary } }
     }
 }
@@ -599,32 +725,77 @@ func (exp *explore)getExploreFloatValue( size int ) string {
     return ""
 }
 
+const (
+    VALUE_HEADER = "values"     // box header
+
+    INT_HEADER = "int"          // content label & value
+    UNSIGNED_INT = "unsigned"   // content value
+    HEXA_INT = "hexa"           // content value
+    OCTAL_INT = "octal"         // content value
+
+    SIGNED8 = "signed8"         // content label & value
+    UNSIGNED8 = "unsigned8"     // content value
+    HEXA8 = "hexa8"             // content value
+    OCTAL8 = "octal8"           // content value
+
+    SIGNED16 = "signed16"       // content label & value
+    UNSIGNED16 = "unsigned16"   // content value
+    HEXA16 = "hexa16"           // content value
+    OCTAL16 = "octal16"         // content value
+
+    SIGNED32 = "signed32"       // content label & value
+    UNSIGNED32 = "unsigned32"   // content value
+    HEXA32 = "hexa32"           // content value
+    OCTAL32 = "octal32"         // content value
+
+    SIGNED64 = "signed64"       // content label & value
+    UNSIGNED64 = "unsigned64"   // content value
+    HEXA64 = "hexa64"           // content value
+    OCTAL64 = "octal64"         // content value
+
+    REAL_HEADER = "real"        // content label & value
+    REAL64_HEADER = "real64"    // content value
+
+    FLOAT32 = "float32"         // content value
+    FLOAT64 = "float64"         // content value
+)
+
 func (exp *explore) updateValuesWithEndianness( ) {
-    names := [...]string{ "SIGNED", "UNSIGNED", "HEXA", "OCTAL" }
+    names := [...]string{ "signed", "unsigned", "hexa", "octal" }
     sizes := [...]int{ 16, 32, 64 }
     suffixes := [...]string{ "16", "32", "64" }
     for j := 0; j < len(sizes); j++ {
         for i:= SIGNED_DECIMAL_FORMAT; i < N_FORMATS; i++ {
             textVal := exp.getExploreIntValue( sizes[j], i )
-            setTextContent( exp.dataBox, names[i]+suffixes[j], textVal )
+            exp.dataBox.setTextValue( names[i]+suffixes[j], textVal )
         }
     }
 
     textVal := exp.getExploreFloatValue( 32 )
-    setTextContent( exp.dataBox, "FLOAT32", textVal )
+    exp.dataBox.setTextValue( FLOAT32, textVal )
     textVal = exp.getExploreFloatValue( 64 )
-    setTextContent( exp.dataBox, "FLOAT64", textVal )
+    exp.dataBox.setTextValue( FLOAT64, textVal )
 }
 
-func getEndianessDef( exp *explore ) *contentDef {
-    var endianNames [2]string
+func (exp *explore)getEndianessControl( ) (endianNames []string, endian int,
+                                           changed func(string, interface{})) {
+    endianNames = make( []string, 2 )
     endianNames[0] = localizeText(dialogExploreEndianBig)
     endianNames[1] = localizeText(dialogExploreEndianLittle)
 
-    endiannesChanged := func( name string, val interface{} ) {
+    if getBoolPreference(BIG_ENDIAN_NAME) == true {
+        endian = 0
+        exp.endian = binary.BigEndian
+    } else {
+        endian = 1
+        exp.endian = binary.LittleEndian
+    }
+
+    changed = func( name string, val interface{} ) {
         pref := preferences{}
         endianName := val.(string)
-        if endianName == endianNames[0] {
+        // localize in case language has changed in the meantime
+        if endianName == localizeText(dialogExploreEndianBig) {
             exp.endian = binary.BigEndian
             pref[name] = true
         } else {
@@ -634,18 +805,7 @@ func getEndianessDef( exp *explore ) *contentDef {
         update( pref )
         exp.updateValuesWithEndianness( )
     }
-
-    var initialVal string
-    if getBoolPreference(BIG_ENDIAN_NAME) == true {
-        initialVal = endianNames[0]
-        exp.endian = binary.BigEndian
-    } else {
-        initialVal = endianNames[1]
-        exp.endian = binary.LittleEndian
-    }
-    return &contentDef { localizeText(dialogExploreEndian), nil,
-                         BIG_ENDIAN_NAME, initialVal,
-                         endianNames[0:], endiannesChanged, 20 }
+    return
 }
 
 const (
@@ -662,21 +822,23 @@ const (
 
 func getValueBox( exp *explore ) *boxDef {
 
-    endianRow := boxDef{ 10, 10, false, "", HORIZONTAL, []interface{} {
-                               getEndianessDef( exp ) } }
+    endianNames, endian, changed := exp.getEndianessControl( )
+    endianRow := boxDef{ 10, 10, false, "", "", HORIZONTAL, []interface{} {
+                         &contentDef { localizeText(dialogExploreEndian), nil,
+                         BIG_ENDIAN_NAME, endianNames[endian],
+                         endianNames, changed, 20 } } }
 
     valueTitle := localizeText(dialogExploreValues)
     headerStyle := &constCtl{ LABEL_ALIGN, 10, false, true, false }
-    headerRow :=  boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                          &contentDef { localizeText(dialogExploreInt), headerStyle, "",
+    headerRow :=  boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                          &contentDef { localizeText(dialogExploreInt), headerStyle, INT_HEADER,
                                         localizeText(dialogExploreSigned),
                                         constCtl{ TITLE_ALIGN, SIGNED_SIZE, false, true, false }, nil, 0 },
-                          &contentDef { "", nil, "",
-                                        localizeText(dialogExploreUnsigned),
+                          &contentDef { "", nil, UNSIGNED_INT, localizeText(dialogExploreUnsigned),
                                         constCtl{ TITLE_ALIGN, UNSIGNED_SIZE, false, true, false }, nil, 0 },
-                          &contentDef { "", nil, "", localizeText(dialogExploreHexa),
+                          &contentDef { "", nil, HEXA_INT, localizeText(dialogExploreHexa),
                                         constCtl{ TITLE_ALIGN, HEXDECIMAL_SIZE, false, true, false }, nil, 0 },
-                          &contentDef { "", nil, "", localizeText(dialogExploreOctal),
+                          &contentDef { "", nil, OCTAL_INT, localizeText(dialogExploreOctal),
                                         constCtl{ TITLE_ALIGN, OCTAL_SIZE, false, true, false }, nil, 0 } } }
 
     signedCtl := constCtl{ VALUE_ALIGN, SIGNED_SIZE, true, true, true }
@@ -689,14 +851,14 @@ func getValueBox( exp *explore ) *boxDef {
         int8Vals[i] = exp.getExploreIntValue( 8, i )
     }
 
-    int8Row := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                &contentDef { localizeText(dialogExploreInt8), headerStyle, "SIGNED8",
+    int8Row := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                &contentDef { localizeText(dialogExploreInt8), headerStyle, SIGNED8,
                               int8Vals[SIGNED_DECIMAL_FORMAT], signedCtl, nil, 0 },
-                &contentDef { "", nil, "UNSIGNED8", int8Vals[UNSIGNED_DECIMAL_FORMAT],
+                &contentDef { "", nil, UNSIGNED8, int8Vals[UNSIGNED_DECIMAL_FORMAT],
                               unsignedCtl, nil, 0 },
-                &contentDef { "", nil, "HEXA8", int8Vals[HEXADECIMAL_FORMAT],
+                &contentDef { "", nil, HEXA8, int8Vals[HEXADECIMAL_FORMAT],
                               hexaCtl, nil, 0 },
-                &contentDef { "", nil, "OCTAL8", int8Vals[OCTAL_FORMAT],
+                &contentDef { "", nil, OCTAL8, int8Vals[OCTAL_FORMAT],
                               octalCtl, nil, 0 } } }
 
     int16Vals := make( []string, N_FORMATS )
@@ -704,14 +866,14 @@ func getValueBox( exp *explore ) *boxDef {
         int16Vals[i] = exp.getExploreIntValue( 16, i )
     }
 
-    int16Row := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                &contentDef { localizeText(dialogExploreInt16), headerStyle, "SIGNED16",
+    int16Row := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                &contentDef { localizeText(dialogExploreInt16), headerStyle, SIGNED16,
                               int16Vals[SIGNED_DECIMAL_FORMAT], signedCtl, nil, 0 },
-                &contentDef { "", nil, "UNSIGNED16", int16Vals[UNSIGNED_DECIMAL_FORMAT],
+                &contentDef { "", nil, UNSIGNED16, int16Vals[UNSIGNED_DECIMAL_FORMAT],
                               unsignedCtl, nil, 0 },
-                &contentDef { "", nil, "HEXA16", int16Vals[HEXADECIMAL_FORMAT],
+                &contentDef { "", nil, HEXA16, int16Vals[HEXADECIMAL_FORMAT],
                               hexaCtl, nil, 0 },
-                &contentDef { "", nil, "OCTAL16", int16Vals[OCTAL_FORMAT],
+                &contentDef { "", nil, OCTAL16, int16Vals[OCTAL_FORMAT],
                               octalCtl, nil, 0 } } }
 
     int32Vals := make( []string, N_FORMATS )
@@ -719,14 +881,14 @@ func getValueBox( exp *explore ) *boxDef {
         int32Vals[i] = exp.getExploreIntValue( 32, i )
     }
 
-    int32Row := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                &contentDef { localizeText(dialogExploreInt32), headerStyle, "SIGNED32",
+    int32Row := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                &contentDef { localizeText(dialogExploreInt32), headerStyle, SIGNED32,
                               int32Vals[SIGNED_DECIMAL_FORMAT], signedCtl, nil, 0 },
-                &contentDef { "", nil, "UNSIGNED32", int32Vals[UNSIGNED_DECIMAL_FORMAT],
+                &contentDef { "", nil, UNSIGNED32, int32Vals[UNSIGNED_DECIMAL_FORMAT],
                               unsignedCtl, nil, 0 },
-                &contentDef { "", nil, "HEXA32", int32Vals[HEXADECIMAL_FORMAT],
+                &contentDef { "", nil, HEXA32, int32Vals[HEXADECIMAL_FORMAT],
                               hexaCtl, nil, 0 },
-                &contentDef { "", nil, "OCTAL32", int32Vals[OCTAL_FORMAT],
+                &contentDef { "", nil, OCTAL32, int32Vals[OCTAL_FORMAT],
                               octalCtl, nil, 0 } } }
 
     int64Vals := make( []string, N_FORMATS )
@@ -734,35 +896,35 @@ func getValueBox( exp *explore ) *boxDef {
         int64Vals[i] = exp.getExploreIntValue( 64, i )
     }
 
-    int64Row := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                &contentDef { localizeText(dialogExploreInt64), headerStyle, "SIGNED64",
+    int64Row := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                &contentDef { localizeText(dialogExploreInt64), headerStyle, SIGNED64,
                               int64Vals[SIGNED_DECIMAL_FORMAT], signedCtl, nil, 0 },
-                &contentDef { "", nil, "UNSIGNED64", int64Vals[UNSIGNED_DECIMAL_FORMAT],
+                &contentDef { "", nil, UNSIGNED64, int64Vals[UNSIGNED_DECIMAL_FORMAT],
                               unsignedCtl, nil, 0 },
-                &contentDef { "", nil, "HEXA64", int64Vals[HEXADECIMAL_FORMAT],
+                &contentDef { "", nil, HEXA64, int64Vals[HEXADECIMAL_FORMAT],
                               hexaCtl, nil, 0 },
-                &contentDef { "", nil, "OCTAL64", int64Vals[OCTAL_FORMAT],
+                &contentDef { "", nil, OCTAL64, int64Vals[OCTAL_FORMAT],
                               octalCtl, nil, 0 } } }
 
-    floatHeader := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                   &contentDef { localizeText(dialogExploreReal), headerStyle, "",
+    floatHeader := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                   &contentDef { localizeText(dialogExploreReal), headerStyle, REAL_HEADER,
                                  localizeText(dialogExploreFloat32),
                                  constCtl{ TITLE_ALIGN, FLOAT_SIZE, false, true, false }, nil, 0 },
-                   &contentDef { "", nil, "",
+                   &contentDef { "", nil, REAL64_HEADER,
                                  localizeText(dialogExploreFloat64),
                                  constCtl{ TITLE_ALIGN, FLOAT_SIZE, false, true, false }, nil, 0 } } }
 
     float32Val := exp.getExploreFloatValue( 32 )
     float64Val := exp.getExploreFloatValue( 64 )
 
-    floatRow := boxDef{ 5, 20, false, "", HORIZONTAL, []interface{} {
-                &contentDef { "", headerStyle, "FLOAT32", float32Val,
+    floatRow := boxDef{ 5, 20, false, "", "", HORIZONTAL, []interface{} {
+                &contentDef { "", headerStyle, FLOAT32, float32Val,
                               constCtl{ VALUE_ALIGN, FLOAT_SIZE, true, true, true }, nil, 0 },
-                &contentDef { "", nil, "FLOAT64", float64Val,
+                &contentDef { "", nil, FLOAT64, float64Val,
                               constCtl{ VALUE_ALIGN, FLOAT_SIZE, true, true, true }, nil, 0 } } }
 
-    separator := headerDef { " ", 0, 0 }
-    return &boxDef { 10, 10, true, valueTitle, VERTICAL, []interface{} {
+    separator := headerDef { " ", "", 0, 0 }
+    return &boxDef { 10, 10, true, valueTitle, VALUE_HEADER, VERTICAL, []interface{} {
                      &endianRow, &headerRow,
                      &int8Row, &int16Row, &int32Row, &int64Row,
                      &separator, &floatHeader, &floatRow, &separator } }
@@ -773,10 +935,13 @@ func getExploreDialogDef( exp *explore, bitOffset int ) *boxDef {
     bitStream := getBitStreamBox( exp, bitOffset )
     values := getValueBox( exp )
 
-    exploreBox := boxDef { 15, 0, false, "", VERTICAL, []interface{} {
+    exploreBox := boxDef { 15, 0, false, "", "", VERTICAL, []interface{} {
                            bitStream, values } }
     return &exploreBox
 }
+
+// slice of openrd explore dialogs
+var exploreDialogs []*explore = make( []*explore, 0 )
 
 func showExploreDialog( data []byte, bitOffset int ) {
 
@@ -802,5 +967,68 @@ func showExploreDialog( data []byte, bitOffset int ) {
     exp.dialog.SetTitle(localizeText(windowTitleExplore))
     exp.dialog.SetDefaultSize(300, 300)
 
+    cleanExploreDialog := func( w *gtk.Window ) bool {
+        for i, x := range exploreDialogs {
+            if x == exp {
+                fmt.Printf( "Closing explore window #%d\n", i )
+                copy( exploreDialogs[i:], exploreDialogs[i+1:] )
+                exploreDialogs = exploreDialogs[:len(exploreDialogs)-1]
+                break
+            }
+        }
+        return false
+    }
+    exp.dialog.Connect( "delete-event", cleanExploreDialog )
+
+    exploreDialogs = append( exploreDialogs, exp )
     exp.dialog.ShowAll()
+}
+
+func (exp *explore)refreshLanguage( ) {
+    exp.dataBox.setLabel( BITSTREAM_HEADER, localizeText(dialogExploreBitStream) )
+
+    exp.dataBox.setLabel( FIRST_BIT, localizeText(dialogExploreBitStreamFirstBit) )
+    exp.dataBox.setLabel( NUMBER_BITS, localizeText(dialogExploreBitStreamNumberBits) )
+    exp.dataBox.setLabel( NUMBER_BITS, localizeText(dialogExploreBitStreamNumberBits) )
+    exp.dataBox.setLabel( BITSTREAM_MSBF, localizeText(dialogExploreBitStreamMSB) )
+
+    orderNames, order, orderChanged := exp.getBitOrderControl( )
+    exp.dataBox.setTextChoices( BITSTREAM_MSBF, orderNames, order, orderChanged )
+
+    exp.dataBox.setLabel( BINARY_VALUE, localizeText(dialogExploreBitStreamBinary) )
+    exp.dataBox.setLabel( OCTAL_VALUE, localizeText(dialogExploreOctal) )
+    exp.dataBox.setLabel( HEXA_VALUE, localizeText(dialogExploreHexa) )
+    exp.dataBox.setLabel( UNSIGNED_DECIMAL, localizeText(dialogExploreUnsigned) )
+    exp.dataBox.setLabel( SIGNED_DECIMAL, localizeText(dialogExploreSigned) )
+
+    exp.dataBox.setLabel( BIG_ENDIAN_NAME, localizeText(dialogExploreEndian) )
+
+    endianNames, endian, endianChanged := exp.getEndianessControl( )
+    exp.dataBox.setTextChoices( BIG_ENDIAN_NAME, endianNames, endian, endianChanged )
+
+    exp.dataBox.setLabel( INT_HEADER, localizeText(dialogExploreInt) )
+    exp.dataBox.setTextValue( INT_HEADER, localizeText(dialogExploreSigned) )
+    exp.dataBox.setTextValue( UNSIGNED_INT, localizeText(dialogExploreUnsigned) )
+    exp.dataBox.setTextValue( HEXA_INT, localizeText(dialogExploreHexa) )
+    exp.dataBox.setTextValue( OCTAL_INT, localizeText(dialogExploreOctal) )
+
+    exp.dataBox.setLabel( SIGNED8, localizeText(dialogExploreInt8) )
+    exp.dataBox.setLabel( SIGNED16, localizeText(dialogExploreInt16) )
+    exp.dataBox.setLabel( SIGNED32, localizeText(dialogExploreInt32) )
+    exp.dataBox.setLabel( SIGNED64, localizeText(dialogExploreInt64) )
+
+    exp.dataBox.setLabel( REAL_HEADER, localizeText(dialogExploreReal) )
+    exp.dataBox.setTextValue( REAL_HEADER, localizeText(dialogExploreFloat32) )
+    exp.dataBox.setTextValue( REAL64_HEADER, localizeText(dialogExploreFloat64) )
+}
+
+func refreshExploreDialogsLanguage( ) {
+    for _, exp := range exploreDialogs {
+        exp.refreshLanguage( )
+    }
+}
+
+func refreshDialogs( ) {
+    refreshPreferencesDialogLanguage( )
+    refreshExploreDialogsLanguage( )
 }

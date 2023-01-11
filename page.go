@@ -1063,11 +1063,20 @@ func (pc *pageContext)setStorage( path string ) (err error) {
     return
 }
 
+// refreshPageStatus is called when language has changed (in case status
+// strings depend on the language)
+func refreshPageStatus( ) {
+    pc := getCurrentPageContext()
+    showInputMode( pc.tempReadOnly, pc.replaceMode )
+    showReadOnly( pc.tempReadOnly )
+}
+
 func (pc *pageContext)reloadContent( path string ) {
     err := pc.store.reload( path )
     if err == nil {
-        pc.showBytePosition()
+// TODO: reset to default read-only preference?
         pc.setCaretPosition( -1, END )  // set caret at 0
+        pc.showBytePosition()
         pc.canvas.QueueDraw( )          // force redraw
     }
 }

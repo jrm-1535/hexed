@@ -65,13 +65,6 @@ func initActions( nItems int ) {
 
     actions["preferences"] = showPreferencesDialog
 
-    languageAction := func( ) {
-        printDebug( "Action: language called\n" )
-        selectLanguage( englishUSA )
-        refreshMenus()
-    }
-    actions["language"] = languageAction
-
     actions["find"] = searchFind
     actions["replace"] = searchReplace
 

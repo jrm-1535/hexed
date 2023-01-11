@@ -17,10 +17,12 @@ const (
 var (
     areaVisible     bool                    // is search/replace area visible?
     searchArea      *gtk.Box                // search and replace area
+    searchLabel     *gtk.Label              // search prompt
     searchBox       *gtk.ComboBox           // search combo box
     searchList      *gtk.ListStore          // search combo box store
 
     replaceOp       *gtk.Box                // replace operation box
+    replaceLabel    *gtk.Label              // replace prompt
     replaceBox      *gtk.ComboBox           // replace combo box
     replaceList     *gtk.ListStore          // replace combo box store
 
@@ -74,11 +76,13 @@ func newComboBox( change func( *gtk.Entry ) ) (*gtk.ComboBox, *gtk.ListStore) {
 // create an horizontal box containing label, comboBox with entry, button 1 & 2
 func newOperationBox( lId, b1Id, b2Id int,
                       change func( *gtk.Entry ) ) (ob *gtk.Box,
+                                                   lb *gtk.Label,
                                                    cb *gtk.ComboBox,
                                                    ls *gtk.ListStore,
                                                    b1, b2 *gtk.Button) {
 
-    label, err := gtk.LabelNew( localizeText( lId ) )
+    var err error
+    lb, err = gtk.LabelNew( localizeText( lId ) )
     if err != nil {
         log.Fatal("newOperationBox: could not create prompt:", err)
     }
@@ -88,19 +92,19 @@ func newOperationBox( lId, b1Id, b2Id int,
     if err != nil {
         log.Fatal("newOperationBox: could not create first button:", err)
     }
-    b1.SetSizeRequest( 100, -1 )
+    b1.SetSizeRequest( 120, -1 )
 
     b2, err = gtk.ButtonNewWithLabel( localizeText( b2Id ) )
     if err != nil {
         log.Fatal("newOperationBox: could not create second button:", err)
     }
-    b2.SetSizeRequest( 100, -1 )
+    b2.SetSizeRequest( 120, -1 )
 
     ob, err = gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
     if err != nil {
         log.Fatal( "newOperationBox: Unable to create box:", err )
     }
-    ob.PackStart( label, false, false, 0 )
+    ob.PackStart( lb, false, false, 0 )
     ob.PackStart( cb, true, true, 1 )
     ob.PackStart( b1, false, false, 0 )
     ob.PackStart( b2, false, false, 0 )
@@ -168,7 +172,7 @@ func appendReplaceText( ) {
 func newSearchReplaceArea( ) *gtk.Box {
 
     var searchOp *gtk.Box
-    searchOp, searchBox, searchList, next, previous =
+    searchOp, searchLabel, searchBox, searchList, next, previous =
                 newOperationBox( findPrompt, buttonNext, buttonPrevious,
                                  incrementalSearch )
 
@@ -181,7 +185,7 @@ func newSearchReplaceArea( ) *gtk.Box {
                           gdk.CONTROL_MASK | gdk.SHIFT_MASK )
     previous.SetTooltipText( localizeText( tooltipPrevious ) )
 
-    replaceOp, replaceBox, replaceList, replace, replaceAll =
+    replaceOp, replaceLabel, replaceBox, replaceList, replace, replaceAll =
                newOperationBox( replacePrompt, buttonReplace, buttonReplaceAll,
                                 updateReplaceTooltip )
     replace.Connect( "clicked", replaceMatch )
@@ -238,6 +242,17 @@ func newSearchReplaceArea( ) *gtk.Box {
     registerForChanges( WRAP_MATCHES, updateWrapping )
     areaVisible = false
     return searchArea
+}
+
+func refreshSearchArea( ) {
+    searchLabel.SetLabel( localizeText( findPrompt ) )
+    replaceLabel.SetLabel( localizeText( replacePrompt ) )
+
+    next.SetLabel( localizeText( buttonNext ) )
+    previous.SetLabel( localizeText( buttonPrevious ) )
+
+    replace.SetLabel( localizeText( buttonReplace ) )
+    replaceAll.SetLabel( localizeText( buttonReplaceAll ) )
 }
 
 func updateWrapping( name string ) {

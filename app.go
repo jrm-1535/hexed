@@ -11,7 +11,7 @@ import (
 )
 
 const (
-    VERSION     = "0.1"
+    VERSION     = "0.5"
     READONLY    = false
 
     HELP        = `hexed [-h] [-v] [-d] [-ro] [filepath]*

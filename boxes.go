@@ -18,25 +18,35 @@ const (
     VERTICAL                = orientation(gtk.ORIENTATION_VERTICAL)
 )
 
-// The top level widget is always a vertical frame (which may not be visible)
-// that contains a box, which contains children: other frames, simple header or
-// content. A box can be vertical or horizontal, and children are packed
-// starting from the top or left, respectively. Header is just a string within
-// an invisible horizontal frame with padding on top and on left sides.
-// Content is an horizontal frame for a name (string) and an associated value.
+// The top level widget is always a box with a frame (which may not be visible)
+// that contains vertically aligned children: other boxes, simple headers or
+// contents. A box can be vertical or horizontal, where children are packed
+// starting from the top or from the left, respectively. The optional frame
+// title can be accessible through the box name and the methods getLabel
+// and setLabel
+
+// Header is just a label (string) within an invisible horizontal frame with
+// padding on top and on left sides. Header name is a string that can be used
+// to get or set the header label programmatically while the dialog is visible,
+// through getLabel and setlabel
+
+// Content is an horizontal box for a label (string) and an associated value.
 // content-value types are limited to boolean, numbers or strings. Content
-// value can be constant (not modifiable from UI) or variable. Content can
-// have a name used to identify its value, either through a callback after
-// the value has been modified by UI or to programmatically change the value
-// while the dialog is visible.
-// The content name is packed starting from the left and value is packed
-// starting from the end, in order to fill up the whole frame.
+// value can be constant (not modifiable from UI) or variable. Content name is
+// a string that can be used to modify both its label and value. The label is
+// accessible through methods getLabel and setLabel. The value is retrieved
+// either through a callback after the value has been modified by UI or
+// programmatically through get<value-type>Value( contentName ). value can be
+// modified using set<value-type>Value( contentName, newValue).
+// Content label is packed starting from the left and value is packed starting
+// from the right, in order to fill up the whole available space.
 type boxDef struct {
     spacing     int             // space between box chidren
     padding     uint            // padding in parent box, if any
 
     frame       bool            // visible frame around box
-    title       string          // optional frame title
+    title       string          // optional frame or box title
+    name        string          // used to get or set title (maybe empty)
 
     direction   orientation     // box orientation
     content     []interface{}   // boxDef, contentDef or header
@@ -97,7 +107,8 @@ type constCtl struct {   // for label or constant text value (if changed is nil)
 
 // header is a simple label with optional top & left padding
 type headerDef  struct {
-    label       string
+    label       string      // visible text in UI
+    name        string      // internal name to get or set the label
     top, left   uint
 }
 
@@ -109,13 +120,43 @@ type headerDef  struct {
 // [  content label 1   value 1 entry ] label + value per content
 // [[ content label 1   value 1 entry ]...[ content label n   value n entry]]
 
+type itemReference struct {
+    monosize    bool        // true if label is in monospace
+    label       interface{} // reference to the item label
+    value       interface{} // reference to the item value
+}
+
 // nokey prevents entering data otherwise than by spinner (with min, max  & inc)
 func noKey( ) bool {
     return true
 }
 
-func addBoolContent( innerBox *gtk.Box, content *contentDef,
-                     access map[string]interface{} ) {
+func (db *dataBox)newLabel( name string, mono bool, label interface{} ) {
+    if name != "" {
+        ref, ok := db.access[name]
+        if ! ok {
+            ref = itemReference{ mono, label, nil }
+        } else {
+            ref.label = label
+        }
+        db.access[name] = ref
+    }
+}
+
+func (db *dataBox)newValue( name string, mono bool, value interface{} ) {
+// FIXME: ignore mono for the time being: add later
+    if name != "" {
+        ref, ok := db.access[name]
+        if ! ok {
+            ref = itemReference{ false, nil, value }
+        } else {
+            ref.value = value
+        }
+        db.access[name] = ref
+    }
+}
+
+func (db *dataBox)addBoolContent( innerBox *gtk.Box, content *contentDef ) {
 
     boolVal := content.initVal.(bool)
 
@@ -133,18 +174,8 @@ func addBoolContent( innerBox *gtk.Box, content *contentDef,
         }
         input.Connect( "toggled", toggled )
     }
-    if access != nil && content.name != "" {
-        access[content.name] = input
-    }
+    db.newValue( content.name, false, input )
     innerBox.PackEnd( input, false, false, content.padding )
-}
-
-func setBoolContent( db *dataBox, name string, val bool ) {
-    input, ok := db.access[name].(gtk.CheckButton)
-    if ! ok {
-        log.Fatalf("setBoolContent: no such bool value %s\n", name )
-    }
-    input.ToggleButton.SetActive( val )
 }
 
 func isKeyDecimal( keyVal uint ) (decimal bool) {
@@ -183,8 +214,7 @@ func decimalKey( entry *gtk.Entry, event *gdk.Event ) bool {
     }
 }
 
-func addIntContent( innerBox *gtk.Box, content *contentDef,
-                    access map[string]interface{} ) {
+func (db *dataBox)addIntContent( innerBox *gtk.Box, content *contentDef ) {
 
     intVal := content.initVal.(int)
 
@@ -194,9 +224,7 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
             log.Fatalf("addIntContent: Could not create constant int %d: %v",
                         intVal, err)
         }
-        if access != nil && content.name != "" {
-            access[content.name] = constant
-        }
+        db.newValue( content.name, false, constant )
         innerBox.PackEnd( constant, false, false, content.padding )
 
     } else  if valCtl, ok := content.valueCtl.(inputCtl); ok {
@@ -213,9 +241,7 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
             content.changed( content.name, v )
         }
         input.Connect( "value-changed", valueChanged )
-        if access != nil && content.name != "" {
-            access[content.name] = input
-        }
+        db.newValue( content.name, false, input )
         innerBox.PackEnd( input, false, false, content.padding )
 
     } else if valCtl, ok := content.valueCtl.([]int); ok {
@@ -240,9 +266,7 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
             }
         }
         input.Connect( "changed", valueChanged )
-        if access != nil && content.name != "" {
-            access[content.name] = input
-        }
+        db.newValue( content.name, false, input )
         innerBox.PackEnd( input, false, false, content.padding )
 
     } else {    // no or unexpected control, use default
@@ -267,65 +291,13 @@ func addIntContent( innerBox *gtk.Box, content *contentDef,
             }
         }
         input.Connect( "activate", valueChanged )
-        if access != nil && content.name != "" {
-            access[content.name] = input
-        }
+        db.newValue( content.name, false, input )
         innerBox.PackEnd( input, false, false, content.padding )
     }
 }
 
-func setIntContent( db *dataBox, name string, val int ) {
-    intContent, ok := db.access[name]
-    if ! ok {
-        log.Fatalf("setIntContent: no such int value %s\n", name )
-    }
-    t := fmt.Sprintf( "%d", val )
-    switch intVal := intContent.(type) {
-    case *gtk.Label: // constant label
-        intVal.SetText( t )
-    case *gtk.SpinButton:
-        intVal.SetValue( float64(val) )
-    case *gtk.ComboBoxText:
-        model, err := intVal.GetModel()
-        if err != nil {
-            log.Fatalf( "setIntContent: unable to get model: %v\n", err )
-        }
-        list := model.ToTreeModel()
-        var index = 0
-        if iter, nonEmpty := list.GetIterFirst( ); nonEmpty {
-            for {
-                v, err := list.GetValue( iter, 0 )
-                if err != nil {
-                    log.Fatalf( "setIntContent: unable to get list value: %v\n",
-                                err )
-                }
-                var ls string
-                ls, err = v.GetString()
-                if err != nil {
-                    log.Fatalf( "setIntContent: unable to get list string: %v\n",
-                                err )
-                }
-                if ls == t {
-                    intVal.SetActive( index )
-                    break
-                }
-                index++
-                if false == list.IterNext( iter ) {
-                    break
-                }
-            }
-        } else {
-            intVal.AppendText( t )
-            intVal.SetActive(0)
-        }
-    case *gtk.Entry:
-        intVal.SetText( t )
-    default:
-        log.Fatalf( "setIntContent: unexpected input type %T\n", intVal )
-    }
-}
-
-func wrapInFrame( w gtk.IWidget, title string, visible bool ) (*gtk.Frame) {
+func (db *dataBox)wrapInFrame( w gtk.IWidget, title, name string,
+                               visible bool ) (*gtk.Frame) {
     frame, err := gtk.FrameNew( title )
     if err != nil {
         log.Fatal("wrapInFrame: Could not create frame", err)
@@ -336,6 +308,7 @@ func wrapInFrame( w gtk.IWidget, title string, visible bool ) (*gtk.Frame) {
     } else {
         frame.SetShadowType( gtk.SHADOW_NONE )
     }
+    db.newLabel( name, false, frame )
     return frame
 }
 
@@ -359,20 +332,35 @@ func copyContent( label *gtk.Label, event *gdk.Event ) bool {
     return false
 }
 
-func makeConstantLabel( text string, name string, cCtl *constCtl,
-                        access map[string]interface{} ) *gtk.Frame {
+func makeMonosizeMarkUp( t string ) string {
+
+const (
+    MONOSIZE_PREFIX = "<span face=\"monospace\">"
+    MONOSIZE_SUFFIX = "</span>"
+)
+
+   return MONOSIZE_PREFIX+t+MONOSIZE_SUFFIX
+}
+
+func (db *dataBox)makeConstantText( text string, name string, isValue bool,
+                                    cCtl *constCtl ) *gtk.Frame {
     constant, err := gtk.LabelNew( "" )
     if nil != err {
-        log.Fatalf("makeConstantLabel: Could not create label %s: %v", text, err)
+        log.Fatalf("makeConstantText: Could not create label %s: %v", text, err)
     }
+    var monosize bool
     if cCtl != nil && cCtl.monosize {
-        constant.SetMarkup( "<span face=\"monospace\">"+text+"</span>" )
+        monosize = true
+        text = makeMonosizeMarkUp( text )
+    }
+
+    constant.SetMarkup(  text )
+    if isValue {
+        db.newValue( name, monosize, constant )
     } else {
-        constant.SetMarkup( text )
+        db.newLabel( name, monosize, constant )
     }
-    if name != "" {
-        access[name] = constant
-    }
+
     if cCtl != nil {
         constant.SetWidthChars( cCtl.size )
         switch cCtl.align {
@@ -384,7 +372,7 @@ func makeConstantLabel( text string, name string, cCtl *constCtl,
         if cCtl.canCopy {
             eb, err := gtk.EventBoxNew( )
             if err != nil {
-                log.Fatalf("makeConstantLabel: could not create event box: %v", err)
+                log.Fatalf("makeConstantText: could not create event box: %v", err)
             }
             eb.SetAboveChild( true )
             eb.Add( constant )
@@ -393,24 +381,23 @@ func makeConstantLabel( text string, name string, cCtl *constCtl,
             }
             eb.Connect( "button_press_event", cc )
             eb.SetTooltipText( localizeText( tooltipCopyValue ) )
-            return wrapInFrame( eb, "", cCtl.frame )
+            return db.wrapInFrame( eb, "", "", cCtl.frame )
         }
-        return wrapInFrame( constant, "", cCtl.frame )
+        return db.wrapInFrame( constant, "", "", cCtl.frame )
     }
-    return wrapInFrame( constant, "", false )
+    return db.wrapInFrame( constant, "", "", false )
 }
 
-func addTextContent( innerBox *gtk.Box, content *contentDef,
-                     access map[string]interface{} ) {
+func (db *dataBox)addTextContent( innerBox *gtk.Box, content *contentDef ) {
 
     textVal := content.initVal.(string)
 
     if content.changed == nil {
         if cCtl, ok := content.valueCtl.(constCtl); ok {
-            frame := makeConstantLabel( textVal, content.name, &cCtl, access )
+            frame := db.makeConstantText( textVal, content.name, true, &cCtl )
             innerBox.PackEnd( frame, false, false, content.padding )
         } else {
-            frame := makeConstantLabel( textVal, content.name, nil, access )
+            frame := db.makeConstantText( textVal, content.name, true, nil )
             innerBox.PackEnd( frame, false, false, content.padding )
         }
         return
@@ -435,9 +422,7 @@ func addTextContent( innerBox *gtk.Box, content *contentDef,
             }
         }
         input.Connect( "activate", textChanged )
-        if access != nil && content.name != "" {
-            access[content.name] = input
-        }
+        db.newValue( content.name, false, input )
         innerBox.PackEnd( input, false, false, content.padding )
     } else if valCtl, ok := content.valueCtl.([]string); ok {
         input, err := gtk.ComboBoxTextNew( )
@@ -457,27 +442,202 @@ func addTextContent( innerBox *gtk.Box, content *contentDef,
             }
         }
         input.Connect( "changed", textChanged )
-        if access != nil && content.name != "" {
-            access[content.name] = input
-        }
+        db.newValue( content.name, false, input )
         innerBox.PackEnd( input, false, false, content.padding )
     }
 }
 
-func setTextContent( db *dataBox, name string, text string ) {
-    textContent, ok := db.access[name]
-    if ! ok {
-        log.Fatalf("setIntContent: no such int value %s\n", name )
+func (db *dataBox)addContentToBox( box *gtk.Box, content *contentDef ) {
+    label := db.makeConstantText( content.label, content.name,
+                                  false, content.labelCtl )
+    innerBox := wrapChildInHorizontalBox( label, content.padding )
+
+    switch content.initVal.(type) {
+    case nil:   // nothing else to add
+    case bool:
+        db.addBoolContent( innerBox, content )
+    case int:
+        db.addIntContent( innerBox, content )
+    case string:
+        db.addTextContent( innerBox, content )
+    default:
+        printDebug( "addContentToBox: unsupported type %T\n", content.initVal )
+        return
     }
-    switch textVal := textContent.(type) {
-    case *gtk.Label: // constant label
-        textVal.SetMarkup( text )
-    case *gtk.Entry:
-        textVal.SetText( text )
+    box.PackStart( innerBox, false, false, 0 )    // in parent box
+}
+
+func (db *dataBox)addHeaderToBox( box *gtk.Box, header *headerDef ) {
+    label, err := gtk.LabelNew( "" )
+    if nil != err {
+        log.Fatal("addHeaderToBox: Could not create label %s:", header, err)
+    }
+    label.SetMarkup( header.label )
+    db.newLabel( header.name, false, label )
+    innerBox := wrapChildInHorizontalBox( label, header.left )
+    box.PackStart( innerBox, false, false, header.top )     // in parent box
+}
+
+func (db *dataBox)addBoxToBox( box *gtk.Box, item *boxDef ) {
+    child := db.makeBox( item )
+    innerBox := wrapChildInHorizontalBox( child, item.padding )
+    box.PackStart( innerBox, false, false, 0 )      // in parent box
+}
+
+func wrapChildInHorizontalBox( child gtk.IWidget, padding uint ) *gtk.Box {
+    innerBox, err := gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 10 )
+    if nil != err {
+        log.Fatal("wrapChidInHorizontalBox: Could not create inner box:", err)
+    }
+    innerBox.PackStart( child, false, false, padding )
+    return innerBox
+}
+
+func (db *dataBox)makeBox( def * boxDef ) *gtk.Frame {
+
+    box, err := gtk.BoxNew( gtk.Orientation(def.direction), def.spacing )
+    if nil != err {
+        log.Fatal("makeBox: Could not create box", err)
+    }
+    for _, item := range def.content {
+        switch item := item.(type) {
+        case *headerDef:
+            db.addHeaderToBox( box, item )
+        case *contentDef:
+            db.addContentToBox( box, item )
+        case *boxDef:
+            db.addBoxToBox( box, item )
+        default:
+            printDebug( "makeBox: unsupported type %T\n", item )
+        }
+    }
+    return db.wrapInFrame( box, def.title, def.name, def.frame )
+}
+
+type dataBox struct {
+    *gtk.Frame
+    access map[string]itemReference
+}
+
+func makeDataBox( def * boxDef ) (db *dataBox) {
+    db = new(dataBox)
+    db.access = make( map[string]itemReference )
+    db.Frame = db.makeBox( def )
+    return
+}
+
+func (db *dataBox) getLabel( name string ) (label string) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "getLabel: item %s does not exist\n", name )
+    }
+    switch lb := ref.label.(type) {
+    case *gtk.Label :
+        label = lb.GetLabel( )
+    case *gtk.Frame :
+        label = lb.GetLabel( )
+    default:
+        log.Panicf( "getLabel: item %s has no label\n", name )
+    }
+    return
+}
+
+func (db *dataBox) setLabel( name string, label string ) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "setLabel: item %s does not exist\n", name )
+    }
+
+    if ref.monosize {
+        label = makeMonosizeMarkUp( label )
+    }
+    switch lb := ref.label.(type) {
+    case *gtk.Label :
+        lb.SetLabel( label )
+    case *gtk.Frame :
+        lb.SetLabel( label )
+    default:
+        log.Panicf( "setLabel: unexpected label type %T for item %s\n", lb, name )
+    }
+}
+
+func (db *dataBox) getBoolValue( name string ) bool {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "getBoolValue: item %s does not exist\n", name )
+    }
+    input, ok := ref.value.(*gtk.CheckButton)
+    if ! ok {
+        log.Panicf("getBoolValue: item %s is not a bool %s\n", name )
+    }
+    return input.ToggleButton.GetActive( )
+}
+
+func (db *dataBox) setBoolValue( name string, val bool ) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "setBoolValue: item %s does not exist\n", name )
+    }
+    input, ok := ref.value.(*gtk.CheckButton)
+    if ! ok {
+        log.Panicf("setBoolValue: item %s is not a bool\n", name )
+    }
+    input.ToggleButton.SetActive( val )
+}
+
+func convertTextToInt64( t string ) int64 {
+    v, e := strconv.ParseInt( t, 10, 64)
+    if e != nil {
+        log.Fatalf( "getIntValue: cannot convert constant text %s to int\n", t )
+    }
+    return v
+}
+
+func (db *dataBox)getIntValue( name string ) (v int64) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "getIntValue: item %s does not exist\n", name )
+    }
+    intValue := ref.value
+    switch intVal := intValue.(type) {
+    case *gtk.Label: // constant value in label
+        t, e := intVal.GetText( )
+        if e != nil {
+            log.Fatalf( "getIntValue: cannot get label text for item %s\n", name )
+        }
+        v = convertTextToInt64( t )
+    case *gtk.SpinButton:
+        v = int64(intVal.GetValue( ) )
     case *gtk.ComboBoxText:
-        model, err := textVal.GetModel()
+        v = convertTextToInt64( intVal.GetActiveText( ) )
+    case *gtk.Entry:
+        t, e := intVal.GetText( )
+        if e != nil {
+            log.Fatalf( "getIntValue: cannot get entry text for item %s\n", name )
+        }
+        v = convertTextToInt64( t )
+    default:
+        log.Panicf( "getIntValue: unexpected item type %T\n", intVal )
+    }
+    return
+}
+
+func (db *dataBox)setIntValue( name string, val int ) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "setIntValue: item %s does not exist\n", name )
+    }
+    intValue := ref.value
+    t := fmt.Sprintf( "%d", val )
+    switch intVal := intValue.(type) {
+    case *gtk.Label: // constant label
+        intVal.SetText( t )
+    case *gtk.SpinButton:
+        intVal.SetValue( float64(val) )
+    case *gtk.ComboBoxText:
+        model, err := intVal.GetModel()
         if err != nil {
-            log.Fatalf( "setIntContent: unable to get model: %v\n", err )
+            log.Fatalf( "setIntValue: unable to get model: %v\n", err )
         }
         list := model.ToTreeModel()
         var index = 0
@@ -485,13 +645,89 @@ func setTextContent( db *dataBox, name string, text string ) {
             for {
                 v, err := list.GetValue( iter, 0 )
                 if err != nil {
-                    log.Fatalf( "setIntContent: unable to get list value: %v\n",
+                    log.Fatalf( "setIntValue: unable to get list value: %v\n",
                                 err )
                 }
                 var ls string
                 ls, err = v.GetString()
                 if err != nil {
-                    log.Fatalf( "setIntContent: unable to get list string: %v\n",
+                    log.Fatalf( "setIntValue: unable to get list string: %v\n",
+                                err )
+                }
+                if ls == t {
+                    intVal.SetActive( index )
+                    break
+                }
+                index++
+                if false == list.IterNext( iter ) {
+                    break
+                }
+            }
+        } else {
+            intVal.AppendText( t )
+            intVal.SetActive(0)
+        }
+    case *gtk.Entry:
+        intVal.SetText( t )
+    default:
+        log.Panicf( "setIntValue: unexpected item type %T\n", intVal )
+    }
+}
+
+func (db *dataBox)getTextValue( name string ) (t string) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "getTextValue: item %s does not exist\n", name )
+    }
+    var err error
+    textValue := ref.value
+    switch textVal := textValue.(type) {
+    case *gtk.Label:
+        t, err = textVal.GetText( )
+        if err != nil {
+            log.Fatalf( "getTextValue: cannot get label text for item %s\n", name )
+        }
+    case *gtk.ComboBoxText:
+        t = textVal.GetActiveText( )
+    default:
+        log.Panicf( "getTextValue: unexpected item type %T\n", textVal )
+    }
+    return
+}
+
+func (db *dataBox) setTextValue( name string, text string ) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "setTextValue: item %s does not exist\n", name )
+    }
+    textValue := ref.value
+
+    switch textVal := textValue.(type) {
+    case *gtk.Label: // constant label
+        if ref.monosize {
+            text = makeMonosizeMarkUp( text )
+        }
+        textVal.SetMarkup( text )
+    case *gtk.Entry:
+        textVal.SetText( text )
+    case *gtk.ComboBoxText:
+        model, err := textVal.GetModel()
+        if err != nil {
+            log.Fatalf( "setTextValue: unable to get model: %v\n", err )
+        }
+        list := model.ToTreeModel()
+        var index = 0
+        if iter, nonEmpty := list.GetIterFirst( ); nonEmpty {
+            for {
+                v, err := list.GetValue( iter, 0 )
+                if err != nil {
+                    log.Fatalf( "setTextValue: unable to get list value: %v\n",
+                                err )
+                }
+                var ls string
+                ls, err = v.GetString()
+                if err != nil {
+                    log.Fatalf( "setTextValue: unable to get list string: %v\n",
                                 err )
                 }
                 if ls == text {
@@ -508,84 +744,35 @@ func setTextContent( db *dataBox, name string, text string ) {
             textVal.SetActive(0)
         }
     default:
-        log.Fatalf( "setTextContent: unexpected input type %T\n", textVal )
+        log.Panicf( "setTextValue: unexpected item type %T\n", textVal )
     }
 }
 
-func addContentToBox( box *gtk.Box, content *contentDef,
-                      access map[string]interface{} ) {
-    label := makeConstantLabel( content.label, "", content.labelCtl, nil )
-    innerBox := wrapChildInHorizontalBox( label, content.padding )
-
-    switch content.initVal.(type) {
-    case nil:   // nothing else to add
-    case bool:
-        addBoolContent( innerBox, content, access )
-    case int:
-        addIntContent( innerBox, content, access )
-    case string:
-        addTextContent( innerBox, content, access )
-    default:
-        printDebug( "addContentToBox: unsupported type %T\n", content.initVal )
-        return
+func (db *dataBox) setTextChoices( name string, choices []string, active int,
+                                   changed func( name string, val interface{} ) ) {
+    ref, ok := db.access[name]
+    if ! ok {
+        log.Panicf( "setTextChoices: item %s does not exist\n", name )
     }
-    box.PackStart( innerBox, false, false, 0 )    // in parent box
-}
-
-func addHeaderToBox( box *gtk.Box, header *headerDef ) {
-    label, err := gtk.LabelNew( "" )
-    if nil != err {
-        log.Fatal("addHeaderToBox: Could not create label %s:", header, err)
-    }
-    label.SetMarkup( header.label )
-    innerBox := wrapChildInHorizontalBox( label, header.left )
-    box.PackStart( innerBox, false, false, header.top )     // in parent box
-}
-
-func addBoxToBox( box *gtk.Box, item *boxDef, access map[string]interface{} ) {
-    child := makeBox( item, access )
-    innerBox := wrapChildInHorizontalBox( child, item.padding )
-    box.PackStart( innerBox, false, false, 0 )      // in parent box
-}
-
-func wrapChildInHorizontalBox( child gtk.IWidget, padding uint ) *gtk.Box {
-    innerBox, err := gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 10 )
-    if nil != err {
-        log.Fatal("wrapChidInHorizontalBox: Could not create inner box:", err)
-    }
-    innerBox.PackStart( child, false, false, padding )
-    return innerBox
-}
-
-func makeBox( def * boxDef, access map[string]interface{} ) *gtk.Frame {
-
-    box, err := gtk.BoxNew( gtk.Orientation(def.direction), def.spacing )
-    if nil != err {
-        log.Fatal("makeBox: Could not create box", err)
-    }
-    for _, item := range def.content {
-        switch item := item.(type) {
-        case *headerDef:
-            addHeaderToBox( box, item )
-        case *contentDef:
-            addContentToBox( box, item, access )
-        case *boxDef:
-            addBoxToBox( box, item, access )
-        default:
-            printDebug( "makeBox: unsupported type %T\n", item )
+    textChoices := ref.value
+    switch textValues := textChoices.(type) {
+    case *gtk.ComboBoxText:
+        textValues.RemoveAll()
+        for _, v := range choices {
+            textValues.AppendText( v )
         }
+        if active >= 0 && active < len(choices) {
+            textValues.SetActive( active )
+        }
+        textChanged := func( b *gtk.ComboBoxText ) {
+            t := b.GetActiveText()
+            if t != "" {
+                changed( name, t )
+            }
+        }
+        textValues.Connect( "changed", textChanged )
+
+    default:
+        log.Panicf( "setTextChoices: unexpected itemm type %T\n", textValues )
     }
-    return wrapInFrame( box, def.title, def.frame )
-}
-
-type dataBox struct {
-    *gtk.Frame
-    access map[string]interface{}
-}
-
-func makeDataBox( def * boxDef ) (db *dataBox) {
-    db = new(dataBox)
-    db.access = make( map[string]interface{} )
-    db.Frame = makeBox( def, db.access )
-    return
 }

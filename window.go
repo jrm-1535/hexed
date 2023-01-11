@@ -601,6 +601,7 @@ func InitApplication( args *hexedArgs ) {
     hexedDebug = args.debug
 
     initPreferences()
+    initResources( )
     initFontContext()
     initPagesContext()
 

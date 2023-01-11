@@ -76,11 +76,13 @@ const (
     CREATE_BACKUP_FILES = "create_backup_files"
     COLOR_THEME_NAME = "theme_name"
     BIG_ENDIAN_NAME = "big_endian"
+    BITSTREAM_MSBF = "bitsteam_msbf"
+    LANGUAGE_NAME = "language_name"
 )
 
 func writeDefault( ) {
     data := preferences {
-                FONT_NAME : "monospace",
+                FONT_NAME : "Monospace",
                 FONT_SIZE : 15,
                 MIN_BYTES_LINE : 16,
                 LINE_BYTE_INC : 4,
@@ -94,6 +96,8 @@ func writeDefault( ) {
                 CREATE_BACKUP_FILES: false,
                 COLOR_THEME_NAME: "Hexed Dark",
                 BIG_ENDIAN_NAME: true,
+                BITSTREAM_MSBF: true,
+                LANGUAGE_NAME: "American English",
     }
 
 //    data["created"] = GetNowAsISO8601UTC()
@@ -184,6 +188,7 @@ func initPreferences( ) {
     setHexedHome()
 
     if ! doesPreferenceFileExists( ) {  // Preference file does not exist
+        log.Printf( "initPreferences: preference file does not exit, creating from default\n" )
         writeDefault( )
     }
     readPreferences( )
