@@ -21,15 +21,15 @@ var (
     searchBox       *gtk.ComboBox           // search combo box
     searchList      *gtk.ListStore          // search combo box store
 
-    replaceOp       *gtk.Box                // replace operation box
+    next            *gtk.Button             // go to next match
+    previous        *gtk.Button             // go to next match
+
+    wrapMode        *gtk.ToggleButton       // search wrap
+    closeSearch     *gtk.Button             // close searchArea
+
     replaceLabel    *gtk.Label              // replace prompt
     replaceBox      *gtk.ComboBox           // replace combo box
     replaceList     *gtk.ListStore          // replace combo box store
-
-    wrapMode        *gtk.ToggleButton       // search wrap
-
-    next            *gtk.Button             // go to next match
-    previous        *gtk.Button             // go to next match
 
     replace         *gtk.Button             // replace match
     replaceAll      *gtk.Button             // replace all matches
@@ -38,7 +38,7 @@ var (
 func getComboEntry( cb *gtk.ComboBox ) *gtk.Entry {
     entry, err := cb.Bin.GetChild( )
     if err != nil {
-        log.Fatalf( "getSearchTextEntry: unable to get entry child: %v\n", err )
+        log.Fatalf( "getComboEntry: unable to get entry child: %v\n", err )
     }
     return entry.(*gtk.Entry)
 }
@@ -51,7 +51,28 @@ func getReplaceEntry() *gtk.Entry {
     return getComboEntry( replaceBox )
 }
 
-func newComboBox( change func( *gtk.Entry ) ) (*gtk.ComboBox, *gtk.ListStore) {
+func newPromptBox( searchPromptId, replacePromptId int ) (pb *gtk.Box,
+                                                          sp, rp *gtk.Label) {
+    var err error
+    sp, err = gtk.LabelNew( localizeText( searchPromptId ) )
+    if err != nil {
+        log.Fatal("newPromptBox: could not create prompt:", err)
+    }
+    rp, err = gtk.LabelNew( localizeText( replacePromptId ) )
+    if err != nil {
+        log.Fatal("newPromptBox: could not create prompt:", err)
+    }
+    pb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
+    if err != nil {
+        log.Fatal( "newPromptBox: Unable to create the prompt box:", err )
+    }
+    pb.PackStart( sp, true, true, 0 )
+    pb.PackStart( rp, true, true, 0 )
+    return
+}
+
+func newComboBox( change func( *gtk.Entry ) bool ) (*gtk.ComboBox,
+                                                    *gtk.ListStore) {
     ls, err := gtk.ListStoreNew( glib.TYPE_STRING )
     if err != nil {
         log.Fatalf( "newComboBox: cannot create ListStore: %v\n", err )
@@ -73,41 +94,100 @@ func newComboBox( change func( *gtk.Entry ) ) (*gtk.ComboBox, *gtk.ListStore) {
     return cb, ls
 }
 
-// create an horizontal box containing label, comboBox with entry, button 1 & 2
-func newOperationBox( lId, b1Id, b2Id int,
-                      change func( *gtk.Entry ) ) (ob *gtk.Box,
-                                                   lb *gtk.Label,
-                                                   cb *gtk.ComboBox,
-                                                   ls *gtk.ListStore,
-                                                   b1, b2 *gtk.Button) {
+func newEntryBox( searchChange,
+                  replaceChange func(*gtk.Entry) bool ) (eb *gtk.Box,
+                                                    scb, rcb *gtk.ComboBox,
+                                                    sls, rls *gtk.ListStore) {
+    scb, sls = newComboBox( searchChange )
+    rcb, rls = newComboBox( replaceChange )
 
     var err error
-    lb, err = gtk.LabelNew( localizeText( lId ) )
+    eb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
     if err != nil {
-        log.Fatal("newOperationBox: could not create prompt:", err)
+        log.Fatal( "newEntryBox: Unable to create the entry area:", err )
     }
-    cb, ls = newComboBox( change )
+    eb.PackStart( scb, true, true, 0 )
+    eb.PackStart( rcb, true, true, 0 )
+    return
+}
 
-    b1, err = gtk.ButtonNewWithLabel( localizeText( b1Id ) )
+func newButtonBox( bId1, bId2, ttip1, ttip2 int,
+                   clicked1, clicked2 func(*gtk.Button) bool ) (bb *gtk.Box,
+                                                           b1, b2 *gtk.Button) {
+    var err error
+    b1, err = gtk.ButtonNewWithLabel( localizeText( bId1 ) )
     if err != nil {
-        log.Fatal("newOperationBox: could not create first button:", err)
+        log.Fatal("newButtonBox: could not create first button:", err)
     }
-    b1.SetSizeRequest( 120, -1 )
+    b1.Connect( "clicked", clicked1 )
+    b1.SetTooltipText( localizeText( ttip1 ) )
 
-    b2, err = gtk.ButtonNewWithLabel( localizeText( b2Id ) )
+    b2, err = gtk.ButtonNewWithLabel( localizeText( bId2 ) )
     if err != nil {
-        log.Fatal("newOperationBox: could not create second button:", err)
+        log.Fatal("newButtonBox: could not create second button:", err)
     }
-    b2.SetSizeRequest( 120, -1 )
+    b2.Connect( "clicked", clicked2 )
+    b2.SetTooltipText( localizeText( ttip2 ) )
 
-    ob, err = gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
+    bb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
     if err != nil {
-        log.Fatal( "newOperationBox: Unable to create box:", err )
+        log.Fatal( "newButtonBox: Unable to create the entry area:", err )
     }
-    ob.PackStart( lb, false, false, 0 )
-    ob.PackStart( cb, true, true, 1 )
-    ob.PackStart( b1, false, false, 0 )
-    ob.PackStart( b2, false, false, 0 )
+    bb.PackStart( b1, false, false, 0 )
+    bb.PackStart( b2, false, false, 0 )
+    return
+}
+
+func newIconButton( iconName string, iconTooltip int,
+                    clicked func(*gtk.Button) bool ) (ibb *gtk.Box,
+                                                 ib *gtk.Button) {
+    var err error
+    ib, err = gtk.ButtonNewFromIconName( iconName, gtk.ICON_SIZE_BUTTON )
+    if err != nil {
+        log.Fatal("newIconButton: could not create icon button:", err)
+    }
+    ib.Connect( "button-press-event", clicked )
+    ib.SetTooltipText( localizeText( iconTooltip ) )
+
+    ibb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
+    if err != nil {
+        log.Fatal( "newIconButton: Unable to create button box:", err )
+    }
+    ibb.PackStart( ib, false, false, 0 )
+    return
+}
+
+func newIconToggleButton( iconName string, iconToggleTooltip int,
+                          active bool ) (tibb *gtk.Box, tib *gtk.ToggleButton) {
+
+    var err error
+    tib, err = gtk.ToggleButtonNew( )
+    if err != nil {
+        log.Fatal("newIconToggleButton: could not create icon toggle button:", err)
+    }
+    icon, err := gtk.ImageNewFromIconName(  iconName, gtk.ICON_SIZE_BUTTON )
+    if err != nil {
+        log.Fatal("newIconToggleButton: could not create icon image:", err)
+    }
+    tib.SetImage( icon )
+    tib.SetActive( active )
+    tib.SetTooltipText( localizeText( iconToggleTooltip ) )
+
+    tibb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
+    if err != nil {
+        log.Fatal( "newIconToggleButton: Unable to create button box:", err )
+    }
+    tibb.PackStart( tib, false, false, 0 )
+    return
+}
+
+func newSearchAreaButtons( toggleIconName, iconName string,
+                           togglettip, iconttip int, active bool,
+                           clicked func(*gtk.Button) bool ) (tbb, bb *gtk.Box,
+                                                        tb *gtk.ToggleButton,
+                                                        b *gtk.Button) {
+    tbb, tb = newIconToggleButton( toggleIconName, togglettip, active )
+    bb, b = newIconButton( iconName, iconttip, clicked )
     return
 }
 
@@ -162,82 +242,56 @@ func appendReplaceText( ) {
     appendEntryText( replaceList, entry )
 }
 
-// search/replace area is a horizontal box that contains one vertical box for
-// operations and two buttons, respectively wrapping around and exiting search.
-// The operation box contains two horizontal boxes each containing one label,
-// only and the two buttons are for next and previous. The second box is for
-// replace and the two buttons are for replace and replace all.
-// It also uses the status area to indicate the number of matches.
-// one combo box with text input, and two buttons. The first box is for search
+// search/replace area is a horizontal box that contains five vertical boxes.
+// The first four vertical boxes contain two items, one related to search and
+// one to replace. The last vertical box contains only one horizontal box with
+// two buttons, one that is related only to search (wrap around) and one that
+// affects both search and replace operations (close).
+// The first vertical box is for prompt labels, the second box is made of text
+// inputs (and drop down menu for previous search texts and previous replace
+// texts), the third box is for buttons next and  replace, the fourth one is
+// for buttons previous and replace all.
+
+// This arrangement in encapsulated boxes allows to keep labels, input area and
+// buttons properly aligned, no matter the size of their text in any language.
+
+const (
+    WRAP_AROUND_ICON_NAME = "view-refresh"
+    SEARCH_CLOSE_ICON_NAME = "window-close"
+)
+
 func newSearchReplaceArea( ) *gtk.Box {
 
-    var searchOp *gtk.Box
-    searchOp, searchLabel, searchBox, searchList, next, previous =
-                newOperationBox( findPrompt, buttonNext, buttonPrevious,
-                                 incrementalSearch )
+    var pBox, eBox, b1Box, b2Box, b3Box, b4Box *gtk.Box
+    pBox, searchLabel, replaceLabel = newPromptBox( findPrompt, replacePrompt )
+    eBox, searchBox, replaceBox, searchList, replaceList =
+                         newEntryBox( incrementalSearch, updateReplaceTooltip )
+    b1Box, next, replace = newButtonBox( buttonNext, buttonReplace,
+                                         tooltipNext, tooltipReplaceNext,
+                                         findNext, replaceMatch )
 
-    next.Connect( "clicked", findNext  )
-    next.SetTooltipText( localizeText( tooltipNext ) )
-    addToWindowShortcuts( next, "clicked", 'g', gdk.CONTROL_MASK )
+    b2Box, previous, replaceAll = newButtonBox( buttonPrevious, buttonReplaceAll,
+                                                tooltipPrevious, tooltipReplaceAll,
+                                                findPrevious, replaceAllMatches )
 
-    previous.Connect( "clicked", findPrevious  )
-    addToWindowShortcuts( previous, "clicked", 'g',
-                          gdk.CONTROL_MASK | gdk.SHIFT_MASK )
-    previous.SetTooltipText( localizeText( tooltipPrevious ) )
+    b3Box, b4Box, wrapMode, closeSearch = newSearchAreaButtons(
+                                          WRAP_AROUND_ICON_NAME, SEARCH_CLOSE_ICON_NAME,
+                                          tooltipWrapAround, tooltipCloseSearch,
+                                          getBoolPreference( WRAP_MATCHES ),
+                                          exitSearch )
 
-    replaceOp, replaceLabel, replaceBox, replaceList, replace, replaceAll =
-               newOperationBox( replacePrompt, buttonReplace, buttonReplaceAll,
-                                updateReplaceTooltip )
-    replace.Connect( "clicked", replaceMatch )
-    replace.SetTooltipText( localizeText( tooltipReplaceNext ) )
-    replaceAll.Connect( "clicked", replaceAllMatches )
-    replaceAll.SetTooltipText( localizeText( tooltipReplaceAll ) )
-
-    opb, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newSearchReplaceArea: Unable to create the operation area:", err )
-    }
-    opb.PackStart( searchOp, false, false, 0 )
-    opb.PackStart( replaceOp, false, false, 0 )
-
-    wrapMode, err = gtk.ToggleButtonNew( )
-    if err != nil {
-        log.Fatal("newSearchReplaceArea: could not create wrap button:", err)
-    }
-    wrapIcon, err := gtk.ImageNewFromIconName(  "view-refresh", gtk.ICON_SIZE_BUTTON )
-    if err != nil {
-        log.Fatal("newSearchReplaceArea: could not create wrapAround image:", err)
-    }
-    wrapMode.SetImage( wrapIcon )
-    wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
-    wrapMode.SetTooltipText( "Wrap around" )
-
-    wrapBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newSearchReplaceArea: Unable to create extra button box:", err )
-    }
-    wrapBox.PackStart( wrapMode, false, false, 0 )
-
-    exit, err := gtk.ButtonNewFromIconName( "window-close", gtk.ICON_SIZE_BUTTON )
-    if err != nil {
-        log.Fatal("newSearchReplaceArea: could not create exit button:", err)
-    }
-    exit.Connect( "button-press-event", hideSearchArea )
-    exit.SetTooltipText( "Close search" )
-
-    exitBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newSearchReplaceArea: Unable to create extra button box:", err )
-    }
-    exitBox.PackStart( exit, false, false, 0 )
-
+    var err error
     searchArea, err = gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
     if err != nil {
         log.Fatal( "newSearchReplaceArea: Unable to create the search area:", err )
     }
-    searchArea.PackStart( opb, true, true, 0 )
-    searchArea.PackStart( wrapBox, false, false, 0 )
-    searchArea.PackStart( exitBox, false, false, 0 )
+
+    searchArea.PackStart( pBox, false, false, 0 )
+    searchArea.PackStart( eBox, true, true, 0 )
+    searchArea.PackStart( b1Box, false, false, 0 )
+    searchArea.PackStart( b2Box, false, false, 0 )
+    searchArea.PackStart( b3Box, false, false, 0 )
+    searchArea.PackEnd( b4Box, false, false, 0 )
 
     registerForChanges( WRAP_MATCHES, updateWrapping )
     areaVisible = false
@@ -249,10 +303,20 @@ func refreshSearchArea( ) {
     replaceLabel.SetLabel( localizeText( replacePrompt ) )
 
     next.SetLabel( localizeText( buttonNext ) )
+    next.SetTooltipText( localizeText( tooltipNext ) )
+
     previous.SetLabel( localizeText( buttonPrevious ) )
+    previous.SetTooltipText( localizeText( tooltipPrevious ) )
 
     replace.SetLabel( localizeText( buttonReplace ) )
+    replace.SetTooltipText( localizeText( tooltipReplaceNext ) )
+
     replaceAll.SetLabel( localizeText( buttonReplaceAll ) )
+    replaceAll.SetTooltipText( localizeText( tooltipReplaceAll ) )
+
+
+    wrapMode.SetTooltipText( localizeText( tooltipWrapAround ) )
+    closeSearch.SetTooltipText( localizeText( tooltipCloseSearch ) )
 }
 
 func updateWrapping( name string ) {
@@ -270,6 +334,11 @@ func hideSearchArea( ) {
     areaVisible = false
 }
 
+func exitSearch( *gtk.Button ) bool {
+    hideSearchArea()
+    return true
+}
+
 func searchGiveFocus( ) {
     entry := getSearchEntry()
     entry.SelectRegion( 0, 0 )
@@ -285,7 +354,7 @@ func setSearchFocus( ) *gtk.Entry {
         b := make( []byte, l << 1 )
         writeHexDigitsFromSlice( b, data )
         entry.SetText( string(b) )
-        entry.SetPosition( -1 )
+//        entry.SetPosition( -1 )
     }
     entry.GrabFocusWithoutSelecting()
     entry.SetPosition( -1 )
@@ -350,7 +419,7 @@ func getAsciiMarkupFromData( data []byte ) string {
     return b.String()
 }
 
-func updateReplaceTooltip( entry *gtk.Entry ) {
+func updateReplaceTooltip( entry *gtk.Entry ) bool {
     text, err := entry.GetText()
     if err != nil {
         log.Fatal("updateReplaceTooltip: cannot get entry text:", err)
@@ -360,9 +429,10 @@ func updateReplaceTooltip( entry *gtk.Entry ) {
     asciiMarkup := getAsciiMarkupFromData( rs )
     entry.SetTooltipMarkup( asciiMarkup )
     updateReplaceButton()
+    return true
 }
 
-func incrementalSearch( entry *gtk.Entry ) {
+func incrementalSearch( entry *gtk.Entry ) bool {
     text, err := entry.GetText()
     if err != nil {
         log.Fatal("incrementalSearch: cannot get entry text:", err)
@@ -376,16 +446,24 @@ func incrementalSearch( entry *gtk.Entry ) {
     pc := getCurrentPageContext()
     pc.findPattern( )
     updateReplaceButton()
+    return true
 }
 
 func highlightSearchResults( showReplace bool ) {
 
     searchArea.Show( )
     if showReplace {
-        replaceOp.Show()
+        replaceLabel.Show()
+        replaceBox.Show()
+        replace.Show()
+        replaceAll.Show()
     } else {
-        replaceOp.Hide( )
+        replaceLabel.Hide( )
+        replaceBox.Hide()
+        replace.Hide()
+        replaceAll.Hide()
     }
+
     removeHighlights()
     entry := setSearchFocus()
     incrementalSearch( entry )
@@ -397,7 +475,7 @@ func searchFind( ) {
 }
 
 func updateReplaceButton( ) {
-    if replaceOp.IsVisible() {
+    if replaceLabel.IsVisible() {
         entry := getReplaceEntry()
         text, err := entry.GetText()
         if err != nil {

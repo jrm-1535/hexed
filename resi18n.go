@@ -187,6 +187,7 @@ const (
     tooltipReplaceAll
 
     tooltipAscii
+    tooltipWrapAround
 
     tooltipCloseSearch
 
@@ -440,14 +441,15 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "ASCII",                                                // tooltipAscii
 
+    "Wrap Around matches",                                  // tooltipWrapAround
     "Close search",                                         // tooltipCloseSearch
 
     "Right click to copy Value",                            // tooltipCopyValue
 
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
-    " Enter hex string to find ",                            // findPrompt
-    "Replacement Hex string ",                              // replacePrompt
+    "Enter hex string to find",                            // findPrompt
+    "Replacement Hex string",                              // replacePrompt
 
     "Save before closing?",                                 // dialogCloseTitle
     "Go to byte",                                           // dialogGotoTitle
@@ -631,13 +633,14 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "ASCII",                                                // tooltipAscii
 
+    "Boucler les correspondances",                          // tooltipWrapAround
     "Fermer la recherche",                                  // tooltipCloseSearch
 
     "Cliquer à droite pour copier la valeur",               // tooltipCopyValue
 
     "Si vous fermez sans enregister, toutes les modifications seront perdues",  // warningCloseFile
     "Entrez l'adresse de l'octet en hexadecimal",           // gotoPrompt
-    " Chercher les characteres hexa",                        // findPrompt
+    "Chercher les characteres hexa",                        // findPrompt
     "Remplacer avec la chaine hexa",                        // replacePrompt
 
     "Enregistrer avant de Fermer ?",                        // dialogCloseTitle
