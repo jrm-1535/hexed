@@ -608,7 +608,7 @@ func InitApplication( args *hexedArgs ) {
     var err error
     window, err = gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
     if err != nil || window == nil {
-        log.Fatal( "Unable to create main window: ", err )
+        log.Fatal( "InitApplication: Unable to create main window: ", err )
     }
 
     window.Connect( "delete_event", exitApplication )
@@ -622,7 +622,7 @@ func InitApplication( args *hexedArgs ) {
     // Assemble the window
     windowBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
     if err != nil {
-        log.Fatalf( "Unable to create a window box: %v\n", err )
+        log.Fatalf( "InitApplication: Unable to create a window box: %v\n", err )
     }
     windowBox.PackStart( menuBar, false, false, 0 )
     windowBox.PackStart( srArea, false, false, 0 )

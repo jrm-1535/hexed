@@ -65,8 +65,8 @@ func initActions( nItems int ) {
 
     actions["preferences"] = showPreferencesDialog
 
-    actions["find"] = searchFind
-    actions["replace"] = searchReplace
+    actions["find"] = searchDialog
+    actions["replace"] = replaceDialog
 
     gotoAction := func( ) {
         op, pos := gotoDialog()

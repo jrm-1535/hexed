@@ -3,325 +3,216 @@ package main
 import (
     "log"
     "strings"
+
+    "internal/layout"
+
 	"github.com/gotk3/gotk3/gtk"
-	"github.com/gotk3/gotk3/glib"
+//	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gdk"
 )
 
 const (
     MAX_SELECTION_LENGTH = 63                   // in bytes
     MAX_TEXT_LENGTH = 2 * MAX_SELECTION_LENGTH  // in nibbles
-    MAX_STORE_ROW = 9                           // 10 entries  (0-9)
+    MAX_HISTORY = 10                            // slots in history slices
+    REPLACE_GRID_ROW = 1
 )
+
+type history struct {
+    store           []string                // previous search/replace entries
+    nInStore        int                     // store use [0:nInstore]
+}
 
 var (
+    searchArea      *layout.Layout          // search and replace area
     areaVisible     bool                    // is search/replace area visible?
-    searchArea      *gtk.Box                // search and replace area
-    searchLabel     *gtk.Label              // search prompt
-    searchBox       *gtk.ComboBox           // search combo box
-    searchList      *gtk.ListStore          // search combo box store
+    replaceVisible  bool                    // search only or search+replace
 
-    next            *gtk.Button             // go to next match
-    previous        *gtk.Button             // go to next match
-
-    wrapMode        *gtk.ToggleButton       // search wrap
-    closeSearch     *gtk.Button             // close searchArea
-
-    replaceLabel    *gtk.Label              // replace prompt
-    replaceBox      *gtk.ComboBox           // replace combo box
-    replaceList     *gtk.ListStore          // replace combo box store
-
-    replace         *gtk.Button             // replace match
-    replaceAll      *gtk.Button             // replace all matches
+    searchHistory,
+    replaceHistory  history                 // search and replace histories
 )
 
-func getComboEntry( cb *gtk.ComboBox ) *gtk.Entry {
-    entry, err := cb.Bin.GetChild( )
-    if err != nil {
-        log.Fatalf( "getComboEntry: unable to get entry child: %v\n", err )
-    }
-    return entry.(*gtk.Entry)
-}
-
-func getSearchEntry( ) *gtk.Entry {
-    return getComboEntry( searchBox )
-}
-
-func getReplaceEntry() *gtk.Entry {
-    return getComboEntry( replaceBox )
-}
-
-func newPromptBox( searchPromptId, replacePromptId int ) (pb *gtk.Box,
-                                                          sp, rp *gtk.Label) {
-    var err error
-    sp, err = gtk.LabelNew( localizeText( searchPromptId ) )
-    if err != nil {
-        log.Fatal("newPromptBox: could not create prompt:", err)
-    }
-    rp, err = gtk.LabelNew( localizeText( replacePromptId ) )
-    if err != nil {
-        log.Fatal("newPromptBox: could not create prompt:", err)
-    }
-    pb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newPromptBox: Unable to create the prompt box:", err )
-    }
-    pb.PackStart( sp, true, true, 0 )
-    pb.PackStart( rp, true, true, 0 )
-    return
-}
-
-func newComboBox( change func( *gtk.Entry ) bool ) (*gtk.ComboBox,
-                                                    *gtk.ListStore) {
-    ls, err := gtk.ListStoreNew( glib.TYPE_STRING )
-    if err != nil {
-        log.Fatalf( "newComboBox: cannot create ListStore: %v\n", err )
-    }
-    cb, err := gtk.ComboBoxNewWithModelAndEntry( ls )
-    if err != nil {
-        log.Fatalf( "newComboBox: cannot create ComboBox: %v\n", err )
-    }
-    cb.SetEntryTextColumn(0)
-
-    entry := getComboEntry( cb )
-    entry.SetMaxLength( MAX_TEXT_LENGTH )
-    entry.SetCanFocus( true )
-    entry.Connect( "button-press-event", grabFocus )
-    entry.Connect( "key-press-event", hexFilter )
-    if change != nil {
-        entry.Connect( "changed", change )
-    }
-    return cb, ls
-}
-
-func newEntryBox( searchChange,
-                  replaceChange func(*gtk.Entry) bool ) (eb *gtk.Box,
-                                                    scb, rcb *gtk.ComboBox,
-                                                    sls, rls *gtk.ListStore) {
-    scb, sls = newComboBox( searchChange )
-    rcb, rls = newComboBox( replaceChange )
-
-    var err error
-    eb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newEntryBox: Unable to create the entry area:", err )
-    }
-    eb.PackStart( scb, true, true, 0 )
-    eb.PackStart( rcb, true, true, 0 )
-    return
-}
-
-func newButtonBox( bId1, bId2, ttip1, ttip2 int,
-                   clicked1, clicked2 func(*gtk.Button) bool ) (bb *gtk.Box,
-                                                           b1, b2 *gtk.Button) {
-    var err error
-    b1, err = gtk.ButtonNewWithLabel( localizeText( bId1 ) )
-    if err != nil {
-        log.Fatal("newButtonBox: could not create first button:", err)
-    }
-    b1.Connect( "clicked", clicked1 )
-    b1.SetTooltipText( localizeText( ttip1 ) )
-
-    b2, err = gtk.ButtonNewWithLabel( localizeText( bId2 ) )
-    if err != nil {
-        log.Fatal("newButtonBox: could not create second button:", err)
-    }
-    b2.Connect( "clicked", clicked2 )
-    b2.SetTooltipText( localizeText( ttip2 ) )
-
-    bb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newButtonBox: Unable to create the entry area:", err )
-    }
-    bb.PackStart( b1, false, false, 0 )
-    bb.PackStart( b2, false, false, 0 )
-    return
-}
-
-func newIconButton( iconName string, iconTooltip int,
-                    clicked func(*gtk.Button) bool ) (ibb *gtk.Box,
-                                                 ib *gtk.Button) {
-    var err error
-    ib, err = gtk.ButtonNewFromIconName( iconName, gtk.ICON_SIZE_BUTTON )
-    if err != nil {
-        log.Fatal("newIconButton: could not create icon button:", err)
-    }
-    ib.Connect( "button-press-event", clicked )
-    ib.SetTooltipText( localizeText( iconTooltip ) )
-
-    ibb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newIconButton: Unable to create button box:", err )
-    }
-    ibb.PackStart( ib, false, false, 0 )
-    return
-}
-
-func newIconToggleButton( iconName string, iconToggleTooltip int,
-                          active bool ) (tibb *gtk.Box, tib *gtk.ToggleButton) {
-
-    var err error
-    tib, err = gtk.ToggleButtonNew( )
-    if err != nil {
-        log.Fatal("newIconToggleButton: could not create icon toggle button:", err)
-    }
-    icon, err := gtk.ImageNewFromIconName(  iconName, gtk.ICON_SIZE_BUTTON )
-    if err != nil {
-        log.Fatal("newIconToggleButton: could not create icon image:", err)
-    }
-    tib.SetImage( icon )
-    tib.SetActive( active )
-    tib.SetTooltipText( localizeText( iconToggleTooltip ) )
-
-    tibb, err = gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
-    if err != nil {
-        log.Fatal( "newIconToggleButton: Unable to create button box:", err )
-    }
-    tibb.PackStart( tib, false, false, 0 )
-    return
-}
-
-func newSearchAreaButtons( toggleIconName, iconName string,
-                           togglettip, iconttip int, active bool,
-                           clicked func(*gtk.Button) bool ) (tbb, bb *gtk.Box,
-                                                        tb *gtk.ToggleButton,
-                                                        b *gtk.Button) {
-    tbb, tb = newIconToggleButton( toggleIconName, togglettip, active )
-    bb, b = newIconButton( iconName, iconttip, clicked )
-    return
-}
-
-func appendEntryText( list *gtk.ListStore, entry *gtk.Entry ) {
-    text, err := entry.GetText()
-    if err != nil {
-        log.Panicln("appendEntryText: Cannot get entry text")
-    }
-
-    // if text already exists in list, just move its entry to the first entry
-    nEntries := 0
-    if iter, nonEmpty := list.GetIterFirst( ); nonEmpty {
-        for {
-            v, err := list.GetValue( iter, 0 )
-            if err != nil {
-                log.Fatal( "appendEntryText: unable to get list value:", err )
+func (h *history) update( text string ) []string {
+    if h.nInStore > 0 {
+        for i := 0; i < h.nInStore; i++ {   // check if already in history
+            if text == h.store[i] {
+                if i > 0 {                  // move store[i] -> store[0]
+                    entry := h.store[i]
+                    copy ( h.store[1:i+1], h.store[0:i] )
+                    h.store[0] = entry      // and update comboText
+                    return h.store[0:h.nInStore]
+                } else {                    // same as before, no update needed
+                    return h.store[0:0]
+                }
             }
-            var ls string
-            ls, err = v.GetString()
-            if err != nil {
-                log.Fatal( "appendEntryText: unable to get list string:", err )
-            }
-            if ls == text {
-                list.MoveAfter( iter, nil )
-                return
-            }
-            nEntries ++
-            if false == list.IterNext( iter ) {
-                break
-            }
-        }
+        }                                   // not found in history, make room
+        copy( h.store[1:MAX_HISTORY], h.store[0:h.nInStore] )
     }
-    // otherwise check if there is room and just prepend the text
-    if nEntries >= MAX_STORE_ROW {             // remove last entry
-        path, _ := gtk.TreePathNewFromIndicesv( []int{ MAX_STORE_ROW } )
-        iter, _ := list.GetIter( path )
-        list.Remove( iter )
+    h.store[0] = text                       // store new entry
+    if h.nInStore < MAX_HISTORY {
+        h.nInStore ++
     }
-    iter := list.InsertAfter( nil )       // first entry
-    if err := list.SetValue( iter, 0, text ); err != nil {
-        log.Fatal( "appendEntryText: unable to get append item:", err )
-    }
+    return h.store[0:h.nInStore]            // and update comboText
 }
 
 func appendSearchText( ) {
-    entry := getSearchEntry()
-    appendEntryText( searchList, entry )
+    value, err := searchArea.GetItemValue( "searchInp" )
+    if err != nil {
+        log.Fatalf("appendSearchText: can't get search input\n")
+    }
+    text := value.(string)
+    choices := (&searchHistory).update( text )
+    if len( choices ) > 0 {
+        searchArea.SetItemChoices( "searchInp", choices, 0, incrementalSearch )
+    }
 }
 
 func appendReplaceText( ) {
-    entry := getReplaceEntry()
-    appendEntryText( replaceList, entry )
+    value, err := searchArea.GetItemValue( "replaceInp" )
+    if err != nil {
+        log.Fatalf("appendReplaceText: can't get search input\n")
+    }
+    text := value.(string)
+    choices := (&replaceHistory).update( text )
+    if len( choices ) > 0 {
+        searchArea.SetItemChoices( "replaceInp", choices, 0, updateReplaceTooltip )
+    }
 }
 
-// search/replace area is a horizontal box that contains five vertical boxes.
-// The first four vertical boxes contain two items, one related to search and
-// one to replace. The last vertical box contains only one horizontal box with
-// two buttons, one that is related only to search (wrap around) and one that
-// affects both search and replace operations (close).
-// The first vertical box is for prompt labels, the second box is made of text
-// inputs (and drop down menu for previous search texts and previous replace
-// texts), the third box is for buttons next and  replace, the fourth one is
-// for buttons previous and replace all.
-
-// This arrangement in encapsulated boxes allows to keep labels, input area and
-// buttons properly aligned, no matter the size of their text in any language.
+func keyPress( name string, key uint, mod layout.KeyModifier ) bool {
+    log.Printf("keyPress: key %#4x modifier %#2x on %s\n", key, mod, name )
+    return layout.HexaFilter( key, mod )
+}
 
 const (
     WRAP_AROUND_ICON_NAME = "view-refresh"
     SEARCH_CLOSE_ICON_NAME = "window-close"
 )
 
-func newSearchReplaceArea( ) *gtk.Box {
+func newSearchReplaceArea( ) *gtk.Widget {
 
-    var pBox, eBox, b1Box, b2Box, b3Box, b4Box *gtk.Box
-    pBox, searchLabel, replaceLabel = newPromptBox( findPrompt, replacePrompt )
-    eBox, searchBox, replaceBox, searchList, replaceList =
-                         newEntryBox( incrementalSearch, updateReplaceTooltip )
-    b1Box, next, replace = newButtonBox( buttonNext, buttonReplace,
-                                         tooltipNext, tooltipReplaceNext,
-                                         findNext, replaceMatch )
+    searchHistory.store = make( []string, MAX_HISTORY )
+    replaceHistory.store = make( []string, MAX_HISTORY )
 
-    b2Box, previous, replaceAll = newButtonBox( buttonPrevious, buttonReplaceAll,
-                                                tooltipPrevious, tooltipReplaceAll,
-                                                findPrevious, replaceAllMatches )
+    const (
+        COL_SPACING uint = 0
+        ROW_SPACING uint = 0
+    )
 
-    b3Box, b4Box, wrapMode, closeSearch = newSearchAreaButtons(
-                                          WRAP_AROUND_ICON_NAME, SEARCH_CLOSE_ICON_NAME,
-                                          tooltipWrapAround, tooltipCloseSearch,
-                                          getBoolPreference( WRAP_MATCHES ),
-                                          exitSearch )
+    promptFmt := layout.TextFmt{ layout.REGULAR, layout.RIGHT, 0, false, nil }
+    searchPrm := layout.ConstDef{ "searchPrm", 0,
+                                  localizeText(findPrompt), "", &promptFmt }
+
+    searchCtl := layout.StrList{ []string{}, true, MAX_TEXT_LENGTH,
+                                 grabFocus, keyPress }
+    searchInp := layout.InputDef{ "searchInp", 0, "", "",
+                                  incrementalSearch, &searchCtl }
+
+    butFmt := layout.TextFmt{ layout.REGULAR, layout.CENTER, 0, false, nil }
+    butCtl := layout.ButtonCtl{ false, false }
+
+    nextLabel := layout.TextDef{ localizeText( buttonNext ), &butFmt }
+    searchNext := layout.InputDef{ "next", 0, &nextLabel,
+                                   localizeText(tooltipNext),
+                                   findNext, &butCtl }
+
+    previousLabel := layout.TextDef{ localizeText(buttonPrevious), &butFmt }
+    searchprevious := layout.InputDef{ "previous", 0, &previousLabel,
+                                       localizeText(tooltipPrevious),
+                                       findPrevious, &butCtl }
+
+    toggleCtl := layout.ButtonCtl{ true, true }
+    wrapLabel := layout.IconDef{ WRAP_AROUND_ICON_NAME }
+    wrapAround := layout.InputDef{ "wrapAround", 0, &wrapLabel,
+                                   localizeText( tooltipWrapAround ),
+                                   nil, &toggleCtl }
+
+    closeLabel := layout.IconDef{ SEARCH_CLOSE_ICON_NAME }
+    closeSearch := layout.InputDef{ "closeSearch", 0, &closeLabel,
+                                    localizeText(tooltipCloseSearch),
+                                    exitSearch, &butCtl }
+
+    replacePrm := layout.ConstDef{ "replacePrm", 0,
+                                   localizeText(replacePrompt),
+                                    "", &promptFmt }
+
+    replaceCtl := layout.StrList{ []string{}, true, MAX_TEXT_LENGTH,
+                                  grabFocus, keyPress }
+    replaceInp := layout.InputDef{ "replaceInp", 0, "", "",
+                                   updateReplaceTooltip, &replaceCtl }
+
+    replaceLabel := layout.TextDef{ localizeText( buttonReplace ), &butFmt }
+    replace := layout.InputDef{ "replace", 0, &replaceLabel,
+                                localizeText( tooltipReplaceNext ),
+                                replaceMatch, &butCtl }
+
+    replaceAllLabel := layout.TextDef{ localizeText( buttonReplaceAll ), &butFmt }
+    replaceAll := layout.InputDef{ "replaceAll", 0, &replaceAllLabel,
+                                   localizeText( tooltipReplaceAll ),
+                                   replaceAllMatches, &butCtl }
+
+    gd := layout.GridDef{ "mainGrid", 0,
+                          layout.HorizontalDef{ COL_SPACING,
+                                                []layout.ColDef{
+                                                    { false },
+                                                    { true },
+                                                    { false },
+                                                    { false },
+                                                    { false },
+                                                    { false }, },
+                                              },
+                          layout.VerticalDef{ ROW_SPACING, []layout.RowDef{
+                                                    { false, []interface{}{
+                                                                &searchPrm,
+                                                                &searchInp,
+                                                                &searchNext,
+                                                                &searchprevious,
+                                                                &wrapAround,
+                                                                &closeSearch } },
+                                                    { false, []interface{}{
+                                                                &replacePrm,
+                                                                &replaceInp,
+                                                                &replace,
+                                                                &replaceAll } },
+                                                                           },
+                                              },
+                        }
 
     var err error
-    searchArea, err = gtk.BoxNew( gtk.ORIENTATION_HORIZONTAL, 0 )
+    searchArea, err = layout.MakeLayout( &gd )
     if err != nil {
-        log.Fatal( "newSearchReplaceArea: Unable to create the search area:", err )
+        log.Fatalf( "newSearchReplaceArea: Unable to create layout: %v\n", err )
     }
-
-    searchArea.PackStart( pBox, false, false, 0 )
-    searchArea.PackStart( eBox, true, true, 0 )
-    searchArea.PackStart( b1Box, false, false, 0 )
-    searchArea.PackStart( b2Box, false, false, 0 )
-    searchArea.PackStart( b3Box, false, false, 0 )
-    searchArea.PackEnd( b4Box, false, false, 0 )
 
     registerForChanges( WRAP_MATCHES, updateWrapping )
     areaVisible = false
-    return searchArea
+    return searchArea.GetRootWidget()
 }
 
 func refreshSearchArea( ) {
-    searchLabel.SetLabel( localizeText( findPrompt ) )
-    replaceLabel.SetLabel( localizeText( replacePrompt ) )
+    searchArea.SetItemValue( "searchPrm", localizeText( findPrompt ) )
+    searchArea.SetItemValue( "replacePrm", localizeText( replacePrompt ) )
 
-    next.SetLabel( localizeText( buttonNext ) )
-    next.SetTooltipText( localizeText( tooltipNext ) )
+    searchArea.SetButtonLabel( "next", localizeText( buttonNext ) )
+    searchArea.SetItemTooltip( "next", localizeText( tooltipNext ) )
 
-    previous.SetLabel( localizeText( buttonPrevious ) )
-    previous.SetTooltipText( localizeText( tooltipPrevious ) )
+    searchArea.SetButtonLabel( "previous", localizeText( buttonPrevious ) )
+    searchArea.SetItemTooltip( "previous", localizeText( tooltipPrevious ) )
 
-    replace.SetLabel( localizeText( buttonReplace ) )
-    replace.SetTooltipText( localizeText( tooltipReplaceNext ) )
+    searchArea.SetButtonLabel( "replace", localizeText( buttonReplace ) )
+    searchArea.SetItemTooltip( "replace", localizeText( tooltipReplaceNext ) )
 
-    replaceAll.SetLabel( localizeText( buttonReplaceAll ) )
-    replaceAll.SetTooltipText( localizeText( tooltipReplaceAll ) )
+    searchArea.SetButtonLabel( "replaceAll", localizeText( buttonReplaceAll ) )
+    searchArea.SetItemTooltip( "replaceAll", localizeText( tooltipReplaceAll ) )
 
 
-    wrapMode.SetTooltipText( localizeText( tooltipWrapAround ) )
-    closeSearch.SetTooltipText( localizeText( tooltipCloseSearch ) )
+    searchArea.SetItemTooltip( "wrapAround", localizeText( tooltipWrapAround ) )
+    searchArea.SetItemTooltip( "closeSearch", localizeText( tooltipCloseSearch ) )
 }
 
 func updateWrapping( name string ) {
     if ! areaVisible {
-        wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
+        searchArea.SetItemValue( "wrapAround", getBoolPreference( WRAP_MATCHES ) )
     }
 }
 
@@ -329,53 +220,46 @@ func hideSearchArea( ) {
     resetMatches(0)
     removeHighlights()
     releaseSearchFocus( )
-    searchArea.Hide( )
-    wrapMode.SetActive( getBoolPreference( WRAP_MATCHES ) )
     areaVisible = false
+    searchArea.View( false )
+    searchArea.SetItemValue( "wrapAround", getBoolPreference( WRAP_MATCHES ) )
 }
 
-func exitSearch( *gtk.Button ) bool {
+func exitSearch( name string, val interface{} ) bool {
     hideSearchArea()
     return true
 }
 
 func searchGiveFocus( ) {
-    entry := getSearchEntry()
-    entry.SelectRegion( 0, 0 )
+    searchArea.SetEntrySelection( "searchInp", 0, 0 )
 }
 
-func setSearchFocus( ) *gtk.Entry {
+func setSearchFocus( ) {
     requestSearchFocus( )
     data := getSelectionData( MAX_SELECTION_LENGTH )
     l := len(data)
-    entry := getSearchEntry()
-
     if l > 0 {
         b := make( []byte, l << 1 )
         writeHexDigitsFromSlice( b, data )
-        entry.SetText( string(b) )
-//        entry.SetPosition( -1 )
+        err := searchArea.SetItemValue( "searchInp", string(b) )
+        if err != nil {
+            log.Fatalf("setSearchFocus: %v", err)
+        }
     }
-    entry.GrabFocusWithoutSelecting()
-    entry.SetPosition( -1 )
+    searchGrabFocus()
     areaVisible = true
-    return entry
 }
 
 // called when main window got focus back while page was not clicked
 func searchGrabFocus( ) {
-    entry := getSearchEntry()
-    entry.GrabFocusWithoutSelecting()
-    entry.SetPosition( -1 )
+    searchArea.SetEntryFocus( "searchInp", true )
+    searchArea.SetEntryCursor( "searchInp", -1 )
 }
 
 // called when text entry has been clicked
-func grabFocus( entry *gtk.Entry, event *gdk.Event ) bool {
-    buttonEvent := gdk.EventButtonNewFromEvent( event )
-    evButton := buttonEvent.Button()
-
+func grabFocus( name string, but gdk.Button ) bool {
     requestSearchFocus( )
-    if evButton != gdk.BUTTON_PRIMARY {
+    if but != gdk.BUTTON_PRIMARY {
         return true
     }
     return false
@@ -419,82 +303,98 @@ func getAsciiMarkupFromData( data []byte ) string {
     return b.String()
 }
 
-func updateReplaceTooltip( entry *gtk.Entry ) bool {
-    text, err := entry.GetText()
-    if err != nil {
-        log.Fatal("updateReplaceTooltip: cannot get entry text:", err)
-    }
+func updateReplaceTooltip( name string, val interface{} ) bool {
+    text := val.(string)
     l := (len(text) >> 1) << 1
     rs := BytesFromHexString( l, text )
     asciiMarkup := getAsciiMarkupFromData( rs )
-    entry.SetTooltipMarkup( asciiMarkup )
+    err := searchArea.SetItemTooltip( "replaceInp", asciiMarkup )
+    if err != nil {
+        log.Fatalf("updateReplaceTooltip: can't update entry tooltip: %v", err)
+    }
     updateReplaceButton()
     return true
 }
 
-func incrementalSearch( entry *gtk.Entry ) bool {
-    text, err := entry.GetText()
-    if err != nil {
-        log.Fatal("incrementalSearch: cannot get entry text:", err)
-    }
+func incrementalSearch( name string, val interface{} ) bool {
+    text := val.(string)
+    search( text )
+    return true
+}
 
+func refreshSearch( ) {
+    text, err := searchArea.GetItemValue( "searchInp" )
+    if err != nil {
+        log.Fatalf("highlightSearchResults: unable to get search input: %v", err )
+    }
+    search( text.(string) )
+}
+
+func search( text string ) {
     l := (len(text) >> 1) << 1
     pattern = BytesFromHexString( l, text )
     asciiMarkup := getAsciiMarkupFromData( pattern )
-    entry.SetTooltipMarkup( asciiMarkup )
-
+    err := searchArea.SetItemTooltip( "searchInp", asciiMarkup )
+    if err != nil {
+        log.Fatalf("search: can't update entry tooltip: %v", err)
+    }
     pc := getCurrentPageContext()
     pc.findPattern( )
     updateReplaceButton()
-    return true
 }
 
 func highlightSearchResults( showReplace bool ) {
 
-    searchArea.Show( )
-    if showReplace {
-        replaceLabel.Show()
-        replaceBox.Show()
-        replace.Show()
-        replaceAll.Show()
-    } else {
-        replaceLabel.Hide( )
-        replaceBox.Hide()
-        replace.Hide()
-        replaceAll.Hide()
+    grid, err := searchArea.GetItemValue( "mainGrid" )
+    if err != nil {
+        log.Fatalf("highlightSearchResults: unable to access main grid: %v", err)
     }
+    err = grid.(*layout.DataGrid).SetRowVisible( REPLACE_GRID_ROW, showReplace )
+    if err != nil {
+        log.Fatalf("highlightSearchResults: unable to change replace visibility: %v", err)
+    }
+    searchArea.View( true )
+    replaceVisible = showReplace
 
     removeHighlights()
-    entry := setSearchFocus()
-    incrementalSearch( entry )
+    setSearchFocus()
+    refreshSearch()
 }
 
-func searchFind( ) {
-    log.Println( "Showing search dialog" )
+func searchDialog( ) {
     highlightSearchResults( false  )
 }
 
-func updateReplaceButton( ) {
-    if replaceLabel.IsVisible() {
-        entry := getReplaceEntry()
-        text, err := entry.GetText()
-        if err != nil {
-            log.Fatal("updateReplaceButton: cannot get entry text:", err)
-        }
-        if len(text) & 1 == 0 {
-            if isMatchSelected() {
-                replace.SetSensitive( true )
-            }
-            replaceAll.SetSensitive( true )
-            return
-        }
+func activateReplaceButtons( replaceState, replaceAllstate bool ) {
+    err := searchArea.SetButtonActive( "replace", replaceState )
+    if err != nil {
+        log.Fatalf("updateReplaceButton: cannot change replace active state: %v", err)
     }
-    replace.SetSensitive( false )
-    replaceAll.SetSensitive( false )
+    err = searchArea.SetButtonActive( "replaceAll", replaceAllstate )
+    if err != nil {
+        log.Fatalf("updateReplaceButton: cannot change replaceAll active state: %v", err)
+    }
 }
 
-func findNext( button *gtk.Button ) bool {
-    log.Println( "findNext")
+func updateReplaceButton( ) {
+    var replaceState, replaceAllState bool
+    if replaceVisible {
+        text, err := searchArea.GetItemValue( "replaceInp" )
+        if err != nil {
+            log.Fatal("updateReplaceButton: cannot get replace text:", err)
+        }
+        if len(text.(string)) & 1 == 0 {
+            replaceAllState = true
+            if isMatchSelected() {
+                replaceState = true
+            }
+        }
+    }
+    activateReplaceButtons(replaceState, replaceAllState )
+}
+
+func findNext( name string, val interface{} ) bool {
+//    log.Println( "findNext")
     requestSearchFocus( )   // to make sure focus is not on main area anymore
     appendSearchText()
     selectNewMatch( true )
@@ -502,8 +402,7 @@ func findNext( button *gtk.Button ) bool {
     return true
 }
 
-func findPrevious( button *gtk.Button ) bool {
-    log.Println( "findPrevious")
+func findPrevious( name string, val interface{} ) bool {
     requestSearchFocus( )   // to make sure focus is not on main area anymore
     appendSearchText()
     selectNewMatch( false )
@@ -511,20 +410,20 @@ func findPrevious( button *gtk.Button ) bool {
     return true
 }
 
-func searchReplace( ) {
-    log.Println( "Showing replace dialog" )
+func replaceDialog( ) {
     highlightSearchResults( true )
     updateReplaceButton()
 }
 
-func replaceMatch( button *gtk.Button ) bool {
+func replaceMatch( name string, val interface{} ) bool {
     log.Println( "replaceMatch")
     requestSearchFocus( )   // to make sure focus is not on main area anymore
-    entry := getReplaceEntry()
-    text, err := entry.GetText()
+
+    val, err := searchArea.GetItemValue( "replaceInp" )
     if err != nil {
-        log.Panicln("replaceMatch: Cannot get entry text")
+        log.Panicln("replaceMatch: Cannot get replace text")
     }
+    text := val.(string)
     printDebug("replaceMatch: replace with \"%s\"\n", text)
 
     l := (len(text) >> 1) << 1
@@ -533,17 +432,18 @@ func replaceMatch( button *gtk.Button ) bool {
     pc := getCurrentPageContext()
     pc.store.replaceBytesAt( searchPos, 0, matchSize, data )
     appendReplaceText()
-    return findNext( nil )
+    return findNext( "", nil )
 }
 
-func replaceAllMatches( button *gtk.Button ) bool {
+func replaceAllMatches( name string, val interface{}) bool {
     log.Println( "replaceAllMatches")
     requestSearchFocus( )   // to make sure focus is not on main area anymore
-    entry := getReplaceEntry()
-    text, err := entry.GetText()
+
+    val, err := searchArea.GetItemValue( "replaceInp" )
     if err != nil {
-        log.Panicln("Cannot get entry text")
+        log.Panicln("replaceAllMatches: Cannot get replace text")
     }
+    text := val.(string)
     printDebug("replaceAllMatches: matches=%v\n", matches)
     printDebug("replaceAllMatches: replace with \"%s\"\n", text)
     l := (len(text) >> 1) << 1
@@ -555,8 +455,7 @@ func replaceAllMatches( button *gtk.Button ) bool {
     appendSearchText()
     appendReplaceText()
 
-    entry = getSearchEntry()
-    incrementalSearch( entry )
+    refreshSearch()
     return true
 }
 
@@ -616,6 +515,14 @@ func resetMatches( size int ) {
     matchSize = int64(size)
 }
 
+func getWrapMode( ) bool {
+    mode, err := searchArea.GetItemValue( "wrapAround" )
+    if err != nil {
+        log.Fatalf("Can't get wrap around value: %v", err )
+    }
+    return mode.(bool)
+}
+
 // return :
 //  if next is true:
 //      the lowest match that is above the current search position or if no
@@ -625,14 +532,13 @@ func resetMatches( size int ) {
 //      match exists below the current search position, the lowest one
 
 func getMatchIndex( next bool ) (matchIndex int) {
-//    fmt.Printf("searchPos=%#x next=%v matches=%v\n", searchPos, next, matches)
     if next {
         for matchIndex = 0; matchIndex < len(matches); matchIndex++ {
             if matches[matchIndex] > searchPos {
                 return
             }
         }
-        if wrapMode.GetActive() {
+        if getWrapMode() {
             matchIndex = 0
         }
     } else {
@@ -641,7 +547,7 @@ func getMatchIndex( next bool ) (matchIndex int) {
                 return
             }
         }
-        if wrapMode.GetActive() {
+        if getWrapMode() {
             matchIndex = len(matches) - 1
         }
     }

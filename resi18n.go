@@ -191,6 +191,10 @@ const (
 
     tooltipCloseSearch
 
+    tooltipSpinButton
+    tooltipSelList
+    tooltipSetMark
+
     tooltipCopyValue
 
     warningCloseFile
@@ -444,12 +448,16 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Wrap Around matches",                                  // tooltipWrapAround
     "Close search",                                         // tooltipCloseSearch
 
+    "increase or decrease with +/- buttons",                // tooltipSpinButton
+    "Select from the list",                                 // tooltipSelList
+    "Set mark to select",                                   // tooltipSetMark
+
     "Right click to copy Value",                            // tooltipCopyValue
 
     "if you close without saving, all modifications will be lost",  // warningCloseFile
     "Enter byte address in hexadecimal",                    // gotoPrompt
-    "Enter hex string to find",                            // findPrompt
-    "Replacement Hex string",                              // replacePrompt
+    "Enter hex string to find",                             // findPrompt
+    "Replacement Hex string",                               // replacePrompt
 
     "Save before closing?",                                 // dialogCloseTitle
     "Go to byte",                                           // dialogGotoTitle
@@ -635,6 +643,10 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Boucler les correspondances",                          // tooltipWrapAround
     "Fermer la recherche",                                  // tooltipCloseSearch
+
+    "Augmenter ou diminuer par les boutons +/-",            // tooltipSpinButton
+    "Choisissez dans la liste",                             // tooltipSelList
+    "Cocher la case",                                       // tooltipSetMark
 
     "Cliquer à droite pour copier la valeur",               // tooltipCopyValue
 
