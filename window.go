@@ -10,16 +10,9 @@ import (
 	"github.com/gotk3/gotk3/gdk"
 )
 
-/*
-    Hexed is an application with a single window. A few global variables
-    are associated with that window. This allows all files within the
-    package to access those variables directly, without the need to pass
-    a structure around.
-*/
-
 var (
-    window          *gtk.Window
-    shortcuts       *gtk.AccelGroup
+    window          *gtk.Window             // main window
+    shortcuts       *gtk.AccelGroup         // menu accelerators
     menus           *menu                   // a menu bar
     mainArea        *workArea               // a main work area
     statusBar       *gtk.Statusbar          // a status bar
@@ -36,14 +29,16 @@ var (
 )
 
 type workArea struct {                      // workArea is
-    notebook       *gtk.Notebook            // a notebook with
-    pages          []*page                  // multiple pages
+    notebook        *gtk.Notebook           // a notebook with
+    pages           []*page                 // multiple pages
+    noNames         []bool                  // track unnamed document #
 }
 
 type page struct {                          // a page is made of
-    label   *gtk.Label                      // one notebook tab label
-    context *pageContext                    // page context
-    path    string                          // page file path
+    label           *gtk.Label              // one notebook tab label
+    context         *pageContext            // page context
+    path            string                  // page file path
+    noName          int                     // or noNames index
 }
 
 func (pg *page)getPath( ) string {
@@ -70,10 +65,18 @@ func (pg *page)saveAs( ) {
         if err != nil {
             errorDisplay( "Unable to save file %s (%v)", pathName, err )
         } else {
-            pg.path = pathName
-            name := filepath.Base( pathName )
-            pg.label.SetText(name)
-            fileExists( true )
+            path, err := filepath.Abs( pathName )
+            if err ==  nil {
+                pg.path = path
+                if pg.noName != -1 {
+                    mainArea.noNames[pg.noName] = false
+                }
+                name := filepath.Base( pathName )
+                pg.label.SetText(name)
+                fileExists( true )
+            } else {
+                errorDisplay( "Unable to save file %s (%v)", pathName, err )
+            }
         }
     }
 }
@@ -299,16 +302,28 @@ func (wa *workArea)removePage( pageIndex int ) {
     if pageIndex < 0 || pageIndex > nPages {
         return
     }
+    if nIndex := wa.pages[pageIndex].noName; nIndex != -1 {
+        wa.noNames[nIndex] = false
+    }
     wa.notebook.RemovePage( pageIndex )
     if wa.notebook.GetNPages() == 0 {
         showNoPageVisual()
     }
-    copy ( mainArea.pages[pageIndex:], mainArea.pages[pageIndex+1:] )
-    mainArea.pages = mainArea.pages[0:nPages-1]
+    copy ( wa.pages[pageIndex:], wa.pages[pageIndex+1:] )
+    wa.pages = wa.pages[0:nPages-1]
 
     if len( mainArea.pages ) == 0 {
         pageExists( false )
     }
+}
+
+func (wa *workArea) getFilepathPage( path string ) int {
+    for i, page := range wa.pages {
+        if path == page.path {
+            return i
+        }
+    }
+    return -1
 }
 
 func closeTab( pg *page ) bool {
@@ -360,12 +375,13 @@ func makeTab( pg *page ) *gtk.Box {
 func (wa *workArea)appendPage( widget *gtk.Widget,
                                label *gtk.Label,
                                context *pageContext,
-                               path string ) (pageIndex int) {
+                               path string, noName int ) (pageIndex int) {
 
     pg := new( page )
     pg.label = label
     pg.context = context
     pg.path = path
+    pg.noName = noName
 
     tab := makeTab( pg )
     if pageIndex = wa.notebook.AppendPage( widget, tab ); -1 == pageIndex {
@@ -389,37 +405,62 @@ func (wa *workArea)getBin() *gtk.Widget {
     return &wa.notebook.Widget
 }
 
+func (wa *workArea)newPageName( ) (string, int) {
+
+    var avail int
+    l := len(wa.noNames)
+    for avail = 0; avail < l; avail++ {
+        if ! wa.noNames[avail] {
+            break
+        }
+    }
+    if avail == l {
+        wa.noNames = append( wa.noNames, true )
+    } else {
+        wa.noNames[avail] = true
+    }
+    return fmt.Sprintf( "%s %d", localizeText(emptyFile), avail ), avail
+}
+
 func newPage( pathName string, readOnly bool ) {
 
     var (
-        err     error
-        context *pageContext
-        widget  *gtk.Widget
+        err         error
+        context     *pageContext
+        widget      *gtk.Widget
+        label       *gtk.Label
+        name, path  string
+        nIndex      int
     )
+    if pathName == "" {
+        name, nIndex = mainArea.newPageName( )
+    } else {
+        name = filepath.Base( pathName )
+        path, err = filepath.Abs( pathName )
+        if err != nil {
+            log.Fatalf( "newPage: Unable to get page absolute path\n" )
+        }
+        fmt.Printf("newPage: file \"%s\" path \"%s\"\n", name, path )
+        pIndex := mainArea.getFilepathPage( path )
+        if pIndex != -1 {
+            mainArea.selectPage( pIndex )
+            return
+        }
+        nIndex = -1
+    }
+
+    if label, err = gtk.LabelNew( name ); nil != err {
+        log.Fatalf("newPage unable to create label %s: %v", name, err)
+    }
 
     if widget, context, err = newPageContent( pathName, readOnly ); nil != err {
         log.Fatalf("newPage unable to create page content for %s: %v", pathName, err)
     }
-
-    var label *gtk.Label
-    var name string
-
-    if pathName == "" {
-        name = fmt.Sprintf( "%s", localizeText(emptyFile) )
-        // TODO: add an emptyFile number
-    } else {
-        name = filepath.Base( pathName )
-        // TODO: check if file is already opened in a page => do not create page
-    }
-//    fmt.Printf("newPage: file \"%s\"\n", name )
-    if label, err = gtk.LabelNew( name ); nil != err {
-        log.Fatalf("newPage unable to create label %s: %v", name, err)
-    }
-    index := mainArea.appendPage( widget, label, context, pathName )
+    pIndex := mainArea.appendPage( widget, label, context, path, nIndex )
     // make sure appendPage is called before activating pageContent
     context.activate( )
     showWindow()
-    mainArea.selectPage( index )
+    mainArea.selectPage( pIndex )
 
     pageExists( true )
     fileExists( pathName != "" )

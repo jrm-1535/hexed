@@ -466,7 +466,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
 var frenchRes [arrayLength]string = [arrayLength]string {
     "02-01-2006 15:04:05",                                  // dateFormat
 
-    "document sans nom",                                    // emptyFile
+    "document",                                             // emptyFile
 
     "LEC",                                                  // textReadOnly
     "MOD",                                                  // textReadWrite
