@@ -55,6 +55,7 @@ type pageContext struct {
     replaceMode         bool        // false for insert mode
     readOnly            bool        // false if file modification can be allowed
     tempReadOnly        bool        // false if file modification is allowed
+    virgin              bool        // true only if right after open or save
 
     // data modification state machine in insert mode
     ins                 func( pc *pageContext, nibble byte )
@@ -628,12 +629,14 @@ func (pc *pageContext)resetSelection() {
 }
 
 func (pc *pageContext)drawDataBackground( cr *cairo.Context ) {
-    selectFont( cr )
-    cr.SetOperator( cairo.OPERATOR_SOURCE )
-    setAddBackgroundColor( cr )
-    cr.Paint( ) // TODO: rectangle for each area
 
     hRect, aRect := pc.getAreasRectangle( )
+    selectFont( cr )
+    cr.SetOperator( cairo.OPERATOR_SOURCE )
+
+    setAddBackgroundColor( cr )
+    cr.Rectangle( 0, hRect.y, hRect.x, hRect.h )
+    cr.Fill( )
     setHexBackgroundColor( cr )
     cr.Rectangle( hRect.x, hRect.y, hRect.w, hRect.h )
     cr.Fill( )
@@ -1074,7 +1077,6 @@ func refreshPageStatus( ) {
 func (pc *pageContext)reloadContent( path string ) {
     err := pc.store.reload( path )
     if err == nil {
-// TODO: reset to default read-only preference?
         pc.setCaretPosition( -1, END )  // set caret at 0
         pc.showBytePosition()
         pc.canvas.QueueDraw( )          // force redraw
@@ -1087,8 +1089,6 @@ func (pc *pageContext)reloadContent( path string ) {
 func (pc *pageContext) refresh( ) {
     width := pc.canvas.GetAllocatedWidth( )
     height := pc.canvas.GetAllocatedHeight( )
-    printDebug( "refresh: width old=%d, new=%d; height old=%d, new=%d\n",
-                pc.width, width, pc.height, height )
     pc.processAreaSizeChange( width, height )
     pc.showBytePosition()
     showInputMode( pc.tempReadOnly, pc.replaceMode )
@@ -1135,7 +1135,7 @@ func (pc *pageContext) isPageModified( path string ) bool {
     if path == "" && 0 == pc.store.length() {
         return false
     }
-    return pc.store.isDirty( )
+    return ! pc.virgin && pc.store.isDirty( )
 }
 
 // Each line is broken up in 3 parts, the address part, the hexadecimal one
@@ -1287,6 +1287,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     showReadOnly( pc.tempReadOnly )
 
     modificationAllowed( ! pc.readOnly, false )
+    pc.virgin = true
     return
 }
 
@@ -1455,6 +1456,9 @@ func (pc *pageContext) saveContentAs( path string ) (err error) {
     l := pc.store.length()
     if l > 0 {
         err = os.WriteFile( path, pc.store.getData( 0, l ), 0666 )
+        if err == nil {
+            pc.virgin = true
+        }
     } else {
         err = fmt.Errorf( "Empty page was not saved\n" )
     }

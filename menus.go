@@ -17,7 +17,6 @@ type accelCode struct {
 type menuItemDef struct {
     aName       string      // action name (must be unique across menus)
     accel       accelCode   // shortcut key
-// TODO: add icon 
     enable      bool        // initial enable state
     labelId     int         // base label id
     hintId      int         // base hint id
@@ -220,6 +219,11 @@ func enableMenuItem( aName string, enable bool ) {
     mi.gtkItem.SetSensitive( enable )
 }
 
+func isMenuItemEnabled( aName string ) bool {
+    mi := locateMenuItemByActionName( aName )
+    return mi.gtkItem.GetSensitive()
+}
+
 // change item toggle state, switching item label from textId 0 to textId 1 or
 // back ro textId 0. return the new toggle state
 func toggleMenuItemState( aName string ) (state bool) {
@@ -236,7 +240,6 @@ func setMenuItemState( aName string, state bool ) {
     mi := locateMenuItemByActionName( aName )
     mi.toggled = state
     mi.gtkItem.SetLabel( localizeText( mi.getTextId() ) )
-
 }
 
 func addMenu( previous *menu, mni *gtk.MenuItem, textId int ) *menu {

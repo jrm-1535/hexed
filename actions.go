@@ -106,7 +106,9 @@ func pageExists( state bool ) {
 }
 
 func fileExists( state bool ) {
-    enableMenuItem( "save", state )
+    if isMenuItemEnabled( "protect" ) {
+        enableMenuItem( "save", state )
+    }
     enableMenuItem( "revert", state )
 }
 
@@ -116,7 +118,9 @@ func explorePossible( state bool ) {
 
 func dataExists( state bool ) {
     enableMenuItem( "selectAll", state )
-    enableMenuItem( "saveAs", state )
+    if isMenuItemEnabled( "protect" ) {
+        enableMenuItem( "saveAs", state )
+    }
     enableMenuItem( "find", state )
     enableMenuItem( "replace", state )
     enableMenuItem( "goto", state )

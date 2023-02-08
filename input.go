@@ -623,6 +623,7 @@ func (pc *pageContext)insCommand( nibble byte ) {
         pc.ins( pc, nibble )
     }
     pc.scrollPositionFollowCaret( pc.caretPos )
+    pc.virgin = false
 }
 
 // add means insert nibble after cleaning selection
@@ -695,6 +696,7 @@ func (pc *pageContext)delCommand( ) {
             pc.scrollPositionFollowCaret( pc.caretPos )
         }
     }
+    pc.virgin = false
 }
 
 func (pc *pageContext)backCommand( ) {
@@ -725,6 +727,7 @@ func (pc *pageContext)backCommand( ) {
             pc.scrollPositionFollowCaret( pc.caretPos )
         }
     }
+    pc.virgin = false
 }
 
 const (
@@ -732,20 +735,20 @@ const (
     KEYPAD_ENTER_KEY = gdk.KEY_KP_Enter
 
     DELETE_KEY = gdk.KEY_Delete
-    BACKSPACE_KEY = 0xff08  // TODO: use gdk.KEY_xxx
+    BACKSPACE_KEY = gdk.KEY_BackSpace
 
-    HOME_KEY = 0xff50
-    END_KEY = 0xff57
+    HOME_KEY = gdk.KEY_Home
+    END_KEY = gdk.KEY_End
 
-    LEFT_KEY = 0xff51
-    UP_KEY = 0xff52
-    RIGHT_KEY = 0xff53
-    DOWN_KEY = 0xff54
+    LEFT_KEY = gdk.KEY_Left
+    UP_KEY = gdk.KEY_Up
+    RIGHT_KEY = gdk.KEY_Right
+    DOWN_KEY = gdk.KEY_Down
 
-    PAGE_UP_KEY = 0xff55
-    PAGE_DOWN_KEY = 0xff56
+    PAGE_UP_KEY = gdk.KEY_Page_Up
+    PAGE_DOWN_KEY = gdk.KEY_Page_Down
 
-    INSERT_KEY = 0xff63
+    INSERT_KEY = gdk.KEY_Insert
 )
 
 func editAtCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {
