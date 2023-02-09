@@ -89,7 +89,7 @@ func (pc *pageContext) getSelection() ( s, l int64) {
     return
 }
 
-func getBytesAtCaret( nBytes int64 ) (data[]byte, bitOffset int) {
+func getBytesAtCaret( nBytes int64 ) (data[]byte, nibblePos int64) {
     pc := getCurrentPageContext()
     byteLen := pc.store.length()
     bytePos := pc.caretPos >> 1
@@ -97,9 +97,7 @@ func getBytesAtCaret( nBytes int64 ) (data[]byte, bitOffset int) {
         nBytes = byteLen - bytePos
     }
     data = pc.store.getData( bytePos, bytePos + nBytes )
-    if pc.caretPos & 1 == 1 {
-        bitOffset = 4
-    }
+    nibblePos = pc.caretPos
     return
 }
 

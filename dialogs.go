@@ -590,11 +590,18 @@ type explore struct {
     dialog      *gtk.Window
     lo          *layout.Layout
     data        []byte
+    offset      int64
     firstBit,
     nBits       int
     msbFirst    bool
     bitStream   string
     endian      binary.ByteOrder
+}
+
+func (exp *explore)setDialogTitle( ) {
+    title := fmt.Sprintf( "%s @%#x bit %d", localizeText(windowTitleExplore),
+                          exp.offset, exp.firstBit )
+    exp.dialog.SetTitle( title )
 }
 
 func (exp *explore)makeBitStream( ) {
@@ -699,6 +706,7 @@ func (exp *explore)updateFirstBit( firstBit int ) bool {
         exp.lo.SetItemValue( NUMBER_BITS, exp.nBits )
     }
     exp.firstBit = firstBit
+    exp.setDialogTitle()
     return exp.updateBitStream()
 }
 
@@ -799,7 +807,7 @@ func getBitstreamBoxDef( exp *explore, firstBit int,
         return exp.updateFirstBit( int(val.(float64)) )
     }
     firstBitVal := layout.InputDef{
-                    FIRST_BIT, 0, 0, tooltipSP, shiftChanged, &firstBitCtl }
+                    FIRST_BIT, 0, exp.firstBit, tooltipSP, shiftChanged, &firstBitCtl }
 
     numBitsPrm := layout.ConstDef{
                     NUMBER_BITS_PRM, EXP_BODY_PADDING,
@@ -811,7 +819,7 @@ func getBitstreamBoxDef( exp *explore, firstBit int,
         return false
     }
     numBitsVal := layout.InputDef{
-                    NUMBER_BITS, 0, 8, tooltipSP, nBitsChanged, &numBitsCtl }
+                    NUMBER_BITS, 0, exp.nBits, tooltipSP, nBitsChanged, &numBitsCtl }
 
     msbFirstPrm := layout.ConstDef{
                     MSBF_PRM, EXP_BODY_PADDING,
@@ -1282,7 +1290,7 @@ func makeExploreDialog( exp *explore, firstBit int ) *layout.Layout {
 // slice of opened explore dialogs
 var exploreDialogs []*explore = make( []*explore, 0 )
 
-func showExploreDialog( data []byte, bitOffset int ) {
+func showExploreDialog( data []byte, nibblePos int64 ) {
 
     exp := new( explore )
 
@@ -1292,7 +1300,16 @@ func showExploreDialog( data []byte, bitOffset int ) {
         log.Fatalf( "showExploreDialog: unable to create top-level window: %v\n", err )
     }
     exp.data = data
-    exp.lo = makeExploreDialog( exp, bitOffset )
+    exp.offset = nibblePos >> 1
+
+    var firstBit int
+    if nibblePos & 1 == 1 {
+        firstBit = 4
+    } else {
+        firstBit = 0
+    }
+
+    exp.lo = makeExploreDialog( exp, firstBit )
     names := exp.lo.GetItemNames()
     printDebug( "explore keys: %v\n", names )
 
@@ -1300,7 +1317,6 @@ func showExploreDialog( data []byte, bitOffset int ) {
     exp.dialog.SetTransientFor( window )
     exp.dialog.SetTypeHint( gdk.WINDOW_TYPE_HINT_DIALOG )
     exp.dialog.SetPosition( gtk.WIN_POS_CENTER_ON_PARENT )
-    exp.dialog.SetTitle(localizeText(windowTitleExplore))
     exp.dialog.SetDefaultSize(300, 300)
 
     cleanExploreDialog := func( w *gtk.Window ) bool {
@@ -1317,6 +1333,7 @@ func showExploreDialog( data []byte, bitOffset int ) {
     exp.dialog.Connect( "delete-event", cleanExploreDialog )
 
     exploreDialogs = append( exploreDialogs, exp )
+    exp.setDialogTitle( )
     exp.dialog.ShowAll()
 }
 
