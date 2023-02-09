@@ -4,7 +4,7 @@ import (
     "log"
     "fmt"
     "strings"
-//    "os"
+    "os"
     "path/filepath"
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
@@ -473,6 +473,7 @@ func newWorkArea( ) *workArea {
     }
     ntbk.SetTabPos( gtk.POS_TOP)
 
+    home := os.Getenv( "HOME" )
     var pageNumber int
     switchPage := func( nb *gtk.Notebook,
                         child *gtk.Widget, num uint ) bool {
@@ -482,6 +483,16 @@ func newWorkArea( ) *workArea {
             page := mainArea.pages[ pageNumber ]
             page.context.refresh( )
             fileExists( page.path != "" )
+            var title string
+            if page.path != "" {
+                dirPath, _ := filepath.Rel( home,filepath.Dir(page.path) )
+                title = fmt.Sprintf("%s (~%s)",
+                                     filepath.Base( page.path ), dirPath )
+            } else {
+                title = fmt.Sprintf( "%s %d",
+                                    localizeText(emptyFile), page.noName )
+            }
+            window.SetTitle( title )
         }
         return false
     }
@@ -654,6 +665,7 @@ func InitApplication( args *hexedArgs ) {
 
     window.Connect( "delete_event", exitApplication )
     window.SetTitle("hexed")
+    window.SetIconName( "applications-utilities" )
 
     menuBar := buildMenus( )
     srArea := newSearchReplaceArea( )
