@@ -67,6 +67,7 @@ const (
     MIN_BYTES_LINE = "minimum_line_size"
     LINE_BYTE_INC = "line_size_increment"
     MAX_BYTES_LINE = "maximum_line_size"
+    BYTES_LINE = "line_size"
     HOR_SEP_SPAN = "horizontal_separator_span"
     VER_SEP_SPAN = "vertical_separator_span"
     START_READ_ONLY = "start_read_only"
@@ -87,6 +88,7 @@ func writeDefault( ) {
                 MIN_BYTES_LINE : 16,
                 LINE_BYTE_INC : 4,
                 MAX_BYTES_LINE: 48,
+                BYTES_LINE : 16,
                 HOR_SEP_SPAN : 4,
                 VER_SEP_SPAN : 0,
                 START_READ_ONLY : true,

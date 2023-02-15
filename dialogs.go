@@ -99,12 +99,59 @@ func closeFileDialog( ) (op int) {
 }
 // ---- goto dialog
 
-func gotoFilter( entry *gtk.Entry, event *gdk.Event ) bool {
-    ev := gdk.EventKeyNewFromEvent(event)
-    return layout.HexaFilter( ev.KeyVal(), layout.KeyModifier(ev.State() & 0xff) )
+var gotoHistory *layout.History
+
+func appendGotoHistory( lo *layout.Layout ) {
+    value, err := lo.GetItemValue( "gotoInp" )
+    if err != nil {
+        log.Fatalf("appendGotoHistory: can't get goto input\n")
+    }
+    choices := gotoHistory.Update( value.(string) )
+    if len( choices ) > 0 {
+        searchArea.SetItemChoices( "gotoInp", choices, 0, nil )
+    }
 }
 
-func gotoDialog( ) (op int, pos int64) {
+func getAddress( s string ) (pos int64) {
+    for i := 0; i < len(s); i++ {
+        pos <<= 4
+        pos += int64(getNibbleFromHexDigit( s[i] ))
+    }
+    return
+}
+
+const (
+    MAX_ADDRESS_SIZE = 64                   // 2^64-1 adddress in bits
+    GOTO_INPUT_SIZE = MAX_ADDRESS_SIZE / 4  // in nibbles
+)
+
+func getGotoDialogDef( origin int64 ) interface{} {
+
+    incrementalGoto := func( name string, val interface{} ) bool {
+        text := val.(string)
+        gotoPos( getAddress( text ) << 1 )
+        return false
+    }
+
+    promptFmt := layout.TextFmt{ layout.REGULAR, layout.CENTER, 0, false, nil }
+    gotoPrm := layout.ConstDef{ "gotoPrm", 0,
+                                localizeText(gotoPrompt), "", &promptFmt }
+    gotoCtl := layout.StrList{ gotoHistory.Get(), true, GOTO_INPUT_SIZE,
+                               nil, keyPress }
+    gotoInp := layout.InputDef{ "gotoInp", 0, "", localizeText(tooltipGoto),
+                                incrementalGoto, &gotoCtl }
+    bd := layout.BoxDef{ "", 0, 15, 0, "", false, layout.VERTICAL,
+                        []interface{}{ &gotoPrm, &gotoInp } }
+    return &bd
+}
+
+func gotoDialog( ) {
+    var err error
+    if nil == gotoHistory {
+        if gotoHistory, err = layout.NewHistory( MAX_HISTORY_DEPTH ); err != nil {
+            log.Fatalf("gotoDialog: could not create goto history: %v", err)
+        }
+    }
     gd, err := gtk.DialogNewWithButtons( localizeText(dialogGotoTitle), window,
                     gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                     []interface{} { localizeText(buttonGo), gtk.RESPONSE_ACCEPT },
@@ -117,36 +164,19 @@ func gotoDialog( ) (op int, pos int64) {
     if err != nil {
         log.Fatal("gotoDialog: could not get content area:", err)
     }
-    label, err := gtk.LabelNew( localizeText( gotoPrompt ) )
+    origin := getCurrentPos()
+    lo, err := layout.MakeLayout( getGotoDialogDef( origin ) )
     if err != nil {
-        log.Fatal("gotoDialog: could not create content label:", err)
+        log.Fatal("gotoDialog: could not make layout:", err)
     }
-    carea.Container.Add( label )
-
-    entry, err := gtk.EntryNew( )
-    if err != nil {
-        log.Fatal("gotoDialog: could not create content entry:", err)
-    }
-
-    entry.SetActivatesDefault( true )
-    entry.Connect( "key-press-event", gotoFilter )
-    carea.Container.Add( entry )
-
+    carea.Container.Add( lo.GetRootWidget() )
     carea.ShowAll()
     response := gd.Run()
     switch response {
     case gtk.RESPONSE_ACCEPT:
-        text, err := entry.GetText()
-        if err != nil {
-            panic("Cannot get entry text\n")
-        }
-        if _, err = fmt.Sscanf( text, "%x", &pos ); err != nil {
-            panic( err )
-        }
-        pos = pos << 1
-        op = DO
+        appendGotoHistory( lo )
     case gtk.RESPONSE_NONE, gtk.RESPONSE_CANCEL:
-        op = CANCEL
+        gotoPos( origin )
     }
     gd.Destroy()
     return
@@ -187,7 +217,7 @@ const (
     THEME_NAME_PROMPT = "themeNamePrompt"
 )
 
-func makePreferenceDialogDisplayLayout( ) *layout.Layout {
+func makePreferenceDialogDisplayDef( ) interface{} {
 
     headerFmt := layout.TextFmt{ layout.BOLD, layout.LEFT, 20, false, nil }
     bodyFmt := layout.TextFmt{ layout.REGULAR, layout.LEFT, 30, false, nil }
@@ -200,7 +230,9 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     minblPrompt := layout.ConstDef{
                     MIN_NBL_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesDisplayMinBytesLine), "", &bodyFmt }
-    minblValCtl := layout.IntCtl{ 8, 32, 4 }
+    minblValCtl := layout.IntCtl{ MIN_BYTES_PER_LINE_LOWER_BOUNDARY,
+                                  MIN_BYTES_PER_LINE_HIGHER_BOUNDARY,
+                                  MIN_BYTES_PER_LINE_INCREMENT_STEP }
     minblVal := layout.InputDef{
                     MIN_BYTES_LINE, 0, getIntPreference(MIN_BYTES_LINE),
                     tooltipSB, changed, &minblValCtl }
@@ -208,7 +240,9 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     maxblPrompt := layout.ConstDef{
                     MAX_NBL_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesDisplayMaxBytesLine), "", &bodyFmt }
-    maxblValCtl := layout.IntCtl{ 32, 64, 4 }
+    maxblValCtl := layout.IntCtl{ MAX_BYTES_PER_LINE_LOWER_BOUNDARY,
+                                  MAX_BYTES_PER_LINE_HIGHER_BOUNDARY,
+                                  MAX_BYTES_PER_LINE_INCREMENT_STEP }
     maxblVal := layout.InputDef{
                     MAX_BYTES_LINE, 0, getIntPreference(MAX_BYTES_LINE),
                     tooltipSB, changed, &maxblValCtl }
@@ -216,7 +250,9 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     nbiPrompt := layout.ConstDef{
                     NBI_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesDisplayLineIncrement), "", &bodyFmt }
-    nbiValCtl := layout.IntCtl{ 4, 16, 2 }
+    nbiValCtl := layout.IntCtl{ BYTES_INCREMENT_LOWER_BOUNDARY,
+                                BYTES_INCREMENT_HIGHER_BOUNDARY,
+                                BYTES_INCREMENT_INCREMENT_STEP }
     nbiVal := layout.InputDef{
                     LINE_BYTE_INC, 0, getIntPreference(LINE_BYTE_INC),
                     tooltipSB, changed, &nbiValCtl }
@@ -224,7 +260,9 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     csepPrompt := layout.ConstDef{
                     CSEP_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesDisplayBytesSeparator), "", &bodyFmt }
-    csepValCtl := layout.IntCtl{ 0, 16, 4 }
+    csepValCtl := layout.IntCtl{ BYTES_SEPARATOR_LOWER_BOUNDARY,
+                                 BYTES_SEPARATOR_HIGHER_BOUNDARY,
+                                 BYTES_SEPARATOR_INCREMENT_STEP }
     csepVal := layout.InputDef{
                     HOR_SEP_SPAN, 0, getIntPreference(HOR_SEP_SPAN),
                     tooltipSB, changed, &csepValCtl }
@@ -232,7 +270,9 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     rsepPrompt := layout.ConstDef{
                     RSEP_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesDisplayLinesSeparator), "", &bodyFmt }
-    rsepValCtl := layout.IntCtl{ 0, 32, 8 }
+    rsepValCtl := layout.IntCtl{ LINES_SEPARATOR_LOWER_BOUNDARY,
+                                 LINES_SEPARATOR_HIGHER_BOUNDARY,
+                                 LINES_SEPARATOR_INCREMENT_STEP }
     rsepVal := layout.InputDef{
                     VER_SEP_SPAN, 0, getIntPreference(VER_SEP_SPAN),
                     tooltipSB, changed, &rsepValCtl }
@@ -245,7 +285,7 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     fontNamePrompt := layout.ConstDef{
                     FONT_NAME_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesFontName), "", &bodyFmt }
-    fontNames := []string{"Courier 10 Pitch", "Liberation Mono", "Monospace"}
+    fontNames := getFontNames()
     fontNameValCtl := layout.StrList{ fontNames,false, 0, nil, nil }
     fontNameVal := layout.InputDef{
                     FONT_NAME, 0, getStringPreference(FONT_NAME),
@@ -254,7 +294,7 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
     fontSizePrompt := layout.ConstDef{
                     FONT_SIZE_PROMPT, PREF_BODY_PADDING,
                     localizeText(dialogPreferencesFontSize), "", &bodyFmt }
-    fontSizeValCtl := layout.IntCtl{ 9, 25, 2 }
+    fontSizeValCtl := layout.IntCtl{ MIN_FONT_SIZE, MAX_FONT_SIZE, FONT_SIZE_INC }
     fontSizeVal := layout.InputDef{
                     FONT_SIZE, 0, getIntPreference(FONT_SIZE),
                     tooltipSB, changed, &fontSizeValCtl }
@@ -319,16 +359,11 @@ func makePreferenceDialogDisplayLayout( ) *layout.Layout {
                                                 },
                                             },
                                 },
-
                  }
-
     bd := layout.BoxDef{ "", 0, 15, 0, "", false, layout.VERTICAL, []interface{}{ &gd } }
-    lo, err := layout.MakeLayout( &bd )
-    if err != nil {
-        log.Fatalf( "Unable to create display preference layout: %v\n", err )
-    }
-    return lo
+    return &bd
 }
+
 
 func updatePreferenceDialogDisplayLanguage( lo *layout.Layout ) {
     lo.SetItemValue( DISPLAY_HEADER, localizeText(dialogPreferencesDisplay) )
@@ -371,7 +406,7 @@ const (
     SEARCH_WRAP_PROMPT = "searchWrapPrompt"
 )
 
-func makePreferenceDialogEditorLayout( ) *layout.Layout {
+func makePreferenceDialogEditorDef( ) interface{} {
 
     headerFmt := layout.TextFmt{ layout.BOLD, layout.LEFT, 20, false, nil }
     bodyFmt := layout.TextFmt{ layout.REGULAR, layout.LEFT, 30, false, nil }
@@ -470,11 +505,7 @@ func makePreferenceDialogEditorLayout( ) *layout.Layout {
                                                 }, }, }, }
 
     bd := layout.BoxDef{ "", 0, 15, 0, "", false, layout.VERTICAL, []interface{}{ &gd } }
-    lo, err := layout.MakeLayout( &bd )
-    if err != nil {
-        log.Fatalf( "Unable to create editor preference layout: %v\n", err )
-    }
-    return lo
+    return &bd
 }
 
 func updatePreferenceDialogEditorLanguage( lo *layout.Layout ) {
@@ -497,97 +528,55 @@ func updatePreferenceDialogEditorLanguage( lo *layout.Layout ) {
     lo.SetItemTooltip( WRAP_MATCHES, localizeText(tooltipSetMark) )
 }
 
-type preferenceDialogPage struct {
-    lo              *layout.Layout
-    updateLanguage  func( lo *layout.Layout )
-    tabId           int
+var preferencesDialog *layout.Dialog
+
+func cleanPrederencesDialog( dg *layout.Dialog ) {
+    enablePreferences( true )
+    preferencesDialog = nil
 }
-
-type preferenceNotebook struct {
-            *gtk.Notebook
-    pages   []preferenceDialogPage
-}
-
-func (pn *preferenceNotebook) refreshLanguage( ) {
-    for i, pg := range pn.pages {
-        npg, err := pn.Notebook.GetNthPage( i )
-        if err != nil {
-            log.Fatalf( "refreshLanguage: unable to get preference page %d\n", i )
-        }
-        pn.Notebook.SetTabLabelText( npg, localizeText( pg.tabId ) )
-        pg.updateLanguage( pg.lo )
-    }
-}
-
-func (pn *preferenceNotebook) appendPreferencePage( lo *layout.Layout,
-                                                    updateLanguage func( lo *layout.Layout ),
-                                                    tabId int ) {
-
-    tab, err := gtk.LabelNew( localizeText( tabId ) )
-    if err != nil {
-        log.Fatalf( "appendPreferencePage: Unable to create label: %v\n", err )
-    }
-    if pageIndex := pn.AppendPage( lo.GetRootWidget(), tab ); -1 == pageIndex {
-        log.Fatalf( "appendPreferencePage: Unable to append page\n" )
-    }
-    pn.pages = append( pn.pages,
-                       preferenceDialogPage{ lo, updateLanguage, tabId } )
-}
-
-var preferenceDialog *preferenceNotebook
 
 func showPreferencesDialog( ) {
-    dialog, err := gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
+    display := layout.DialogPage{ localizeText( dialogPreferencesDisplayTab ),
+                                  makePreferenceDialogDisplayDef( ) }
+    editor := layout.DialogPage{ localizeText( dialogPreferencesEditorTab ),
+                                  makePreferenceDialogEditorDef( ) }
+    var err error
+    preferencesDialog, err = layout.MakeDialog(
+                                  localizeText(windowTitlePreferences),
+                                  window, nil,
+                                  layout.AT_PARENT_CENTER, layout.LEFT_POS,
+                                  []layout.DialogPage{ display, editor },
+                                  cleanPrederencesDialog, 1, 1 )
     if err != nil {
-        log.Fatalf( "showPreferencesDialog: unable to create top-level window: %v\n", err )
+        log.Fatalf( "showPreferencesDialog: error creating dialog: %v", err )
     }
-
-    prefNB := new(preferenceNotebook)
-    prefNB.Notebook, err = gtk.NotebookNew( )
-    if err != nil {
-        log.Fatalf( "showPreferencesDialog: unable to create notebook: %v\n", err )
-    }
-
-    prefNB.Notebook.SetTabPos( gtk.POS_LEFT )
-    dialog.Add( prefNB.Notebook )
-
-    display := makePreferenceDialogDisplayLayout( )
-    prefNB.appendPreferencePage( display,
-                                 updatePreferenceDialogDisplayLanguage,
-                                 dialogPreferencesDisplayTab )
-    editor := makePreferenceDialogEditorLayout( )
-    prefNB.appendPreferencePage( editor,
-                                 updatePreferenceDialogEditorLanguage,
-                                 dialogPreferencesEditorTab )
-
-    dialog.SetTransientFor( window )
-    dialog.SetTypeHint( gdk.WINDOW_TYPE_HINT_DIALOG )
-    dialog.SetPosition( gtk.WIN_POS_CENTER_ON_PARENT )
-    dialog.SetTitle(localizeText(windowTitlePreferences))
-    dialog.SetDefaultSize(300, 300)
-
-    dialog.Connect( "delete-event", cleanPreferencesDialog )
     enablePreferences( false )
-    preferenceDialog = prefNB
-    dialog.ShowAll()
 }
 
-func cleanPreferencesDialog( pd *gtk.Window ) bool {
-    preferenceDialog = nil
-    enablePreferences( true )
+func refreshPreferencesLanguage( pageNumber int, page *layout.Layout ) bool {
+    var tabNameId int
+    if pageNumber == 0 {
+        updatePreferenceDialogDisplayLanguage( page )
+        tabNameId = dialogPreferencesDisplayTab
+    } else {
+        updatePreferenceDialogEditorLanguage( page )
+        tabNameId = dialogPreferencesEditorTab
+    }
+    preferencesDialog.SetPageName( pageNumber, localizeText( tabNameId ) )
     return false
 }
 
 func refreshPreferencesDialogLanguage( ) {
-    if preferenceDialog != nil {
-        preferenceDialog.refreshLanguage( )
+    if preferencesDialog != nil {
+        preferencesDialog.VisitContent( refreshPreferencesLanguage )
+        preferencesDialog.SetTitle( localizeText(windowTitlePreferences) )
     }
 }
 
 // --- explore dialog
 
 type explore struct {
-    dialog      *gtk.Window
+    dialog      *layout.Dialog
     lo          *layout.Layout
     data        []byte
     offset      int64
@@ -1248,7 +1237,7 @@ func getValueBoxDef( exp *explore,
                            true, layout.VERTICAL, []interface{} { &valBox } }
 }
 
-func makeExploreDialog( exp *explore, firstBit int ) *layout.Layout {
+func makeExploreDialogDef( exp *explore, firstBit int ) interface{} {
 
     tooltipSP := localizeText(tooltipSpinButton)
     tooltipSL := localizeText(tooltipSelList)
@@ -1279,26 +1268,12 @@ func makeExploreDialog( exp *explore, firstBit int ) *layout.Layout {
                          []interface{} {
                                 bits, values,
                                  } }
-
-    lo, err := layout.MakeLayout( &bd )
-    if err != nil {
-        log.Fatalf( "Unable to create layout: %v\n", err )
-    }
-    return lo
+    return &bd
 }
-
-// slice of opened explore dialogs
-var exploreDialogs []*explore = make( []*explore, 0 )
 
 func showExploreDialog( data []byte, nibblePos int64 ) {
 
     exp := new( explore )
-
-    var err error
-    exp.dialog, err = gtk.WindowNew( gtk.WINDOW_TOPLEVEL )
-    if err != nil {
-        log.Fatalf( "showExploreDialog: unable to create top-level window: %v\n", err )
-    }
     exp.data = data
     exp.offset = nibblePos >> 1
 
@@ -1309,115 +1284,103 @@ func showExploreDialog( data []byte, nibblePos int64 ) {
         firstBit = 0
     }
 
-    exp.lo = makeExploreDialog( exp, firstBit )
-    names := exp.lo.GetItemNames()
-    printDebug( "explore keys: %v\n", names )
-
-    exp.dialog.Add( exp.lo.GetRootWidget() )
-    exp.dialog.SetTransientFor( window )
-    exp.dialog.SetTypeHint( gdk.WINDOW_TYPE_HINT_DIALOG )
-    exp.dialog.SetPosition( gtk.WIN_POS_CENTER_ON_PARENT )
-    exp.dialog.SetDefaultSize(300, 300)
-
-    cleanExploreDialog := func( w *gtk.Window ) bool {
-        for i, x := range exploreDialogs {
-            if x == exp {
-                fmt.Printf( "Closing explore window #%d\n", i )
-                copy( exploreDialogs[i:], exploreDialogs[i+1:] )
-                exploreDialogs = exploreDialogs[:len(exploreDialogs)-1]
-                break
-            }
-        }
-        return false
+    expDef := layout.DialogPage{ "", makeExploreDialogDef( exp, firstBit ) }
+    dg, err := layout.MakeDialog( "", window, exp,
+                                 layout.AT_PARENT_CENTER,layout.LEFT_POS,
+                                 []layout.DialogPage{ expDef }, nil, 300, 300 )
+    if err != nil {
+        log.Fatalf( "showExploreDialog: error creating dialog: %v", err )
     }
-    exp.dialog.Connect( "delete-event", cleanExploreDialog )
 
-    exploreDialogs = append( exploreDialogs, exp )
+    exp.lo, err = dg.GetPage(0)
+    if err != nil {
+        log.Fatalf( "showExploreDialog: error getting page: %v", err )
+    }
+    exp.dialog = dg
     exp.setDialogTitle( )
-    exp.dialog.ShowAll()
 }
 
-func (exp *explore)refreshLanguage( ) {
+func refreshExploreLanguage( dg *layout.Dialog ) bool {
+    if exp, ok := dg.GetUserData().(*explore); ok {
+        tooltipSP := localizeText(tooltipSpinButton)
+        tooltipSL := localizeText(tooltipSelList)
+        tooltipCC := localizeText(tooltipCopyValue)
 
-    tooltipSP := localizeText(tooltipSpinButton)
-    tooltipSL := localizeText(tooltipSelList)
-    tooltipCC := localizeText(tooltipCopyValue)
+        exp.lo.SetItemValue( BITSTREAM_HEADER, localizeText(dialogExploreBitStream) )
 
-    exp.lo.SetItemValue( BITSTREAM_HEADER, localizeText(dialogExploreBitStream) )
+        exp.lo.SetItemValue( FIRST_BIT_PRM, localizeText(dialogExploreBitStreamFirstBit) )
+        exp.lo.SetItemValue( NUMBER_BITS_PRM, localizeText(dialogExploreBitStreamNumberBits) )
+        exp.lo.SetItemValue( MSBF_PRM, localizeText(dialogExploreBitStreamMSB) )
+        orderNames, order, orderChanged := exp.getBitOrderControl( )
+        exp.lo.SetItemChoices( BITSTREAM_MSBF, orderNames, order, orderChanged )
 
-    exp.lo.SetItemValue( FIRST_BIT_PRM, localizeText(dialogExploreBitStreamFirstBit) )
-    exp.lo.SetItemValue( NUMBER_BITS_PRM, localizeText(dialogExploreBitStreamNumberBits) )
-    exp.lo.SetItemValue( MSBF_PRM, localizeText(dialogExploreBitStreamMSB) )
-    orderNames, order, orderChanged := exp.getBitOrderControl( )
-    exp.lo.SetItemChoices( BITSTREAM_MSBF, orderNames, order, orderChanged )
+        exp.lo.SetItemTooltip( FIRST_BIT, tooltipSP )
+        exp.lo.SetItemTooltip( NUMBER_BITS, tooltipSP )
+        exp.lo.SetItemTooltip( BITSTREAM_MSBF, tooltipSL )
 
-    exp.lo.SetItemTooltip( FIRST_BIT, tooltipSP )
-    exp.lo.SetItemTooltip( NUMBER_BITS, tooltipSP )
-    exp.lo.SetItemTooltip( BITSTREAM_MSBF, tooltipSL )
+        exp.lo.SetItemValue( BINARY_PRM, localizeText(dialogExploreBitStreamBinary) )
+        exp.lo.SetItemValue( OCTAL_PRM, localizeText(dialogExploreOctal) )
+        exp.lo.SetItemValue( HEXA_PRM, localizeText(dialogExploreHexa) )
+        exp.lo.SetItemValue( UNSIGNED_DEC_PRM, localizeText(dialogExploreUnsigned) )
+        exp.lo.SetItemValue( SIGNED_DEC_PRM, localizeText(dialogExploreSigned) )
 
-    exp.lo.SetItemValue( BINARY_PRM, localizeText(dialogExploreBitStreamBinary) )
-    exp.lo.SetItemValue( OCTAL_PRM, localizeText(dialogExploreOctal) )
-    exp.lo.SetItemValue( HEXA_PRM, localizeText(dialogExploreHexa) )
-    exp.lo.SetItemValue( UNSIGNED_DEC_PRM, localizeText(dialogExploreUnsigned) )
-    exp.lo.SetItemValue( SIGNED_DEC_PRM, localizeText(dialogExploreSigned) )
+        exp.lo.SetItemTooltip( BINARY_VAL, tooltipCC )
+        exp.lo.SetItemTooltip( OCTAL_VAL, tooltipCC )
+        exp.lo.SetItemTooltip( HEXA_VAL, tooltipCC )
+        exp.lo.SetItemTooltip( UNSIGNED_DEC, tooltipCC )
+        exp.lo.SetItemTooltip( SIGNED_DEC, tooltipCC )
 
-    exp.lo.SetItemTooltip( BINARY_VAL, tooltipCC )
-    exp.lo.SetItemTooltip( OCTAL_VAL, tooltipCC )
-    exp.lo.SetItemTooltip( HEXA_VAL, tooltipCC )
-    exp.lo.SetItemTooltip( UNSIGNED_DEC, tooltipCC )
-    exp.lo.SetItemTooltip( SIGNED_DEC, tooltipCC )
+        exp.lo.SetItemTooltip( VALUE_HEADER, localizeText(dialogExploreValues) )
 
-    exp.lo.SetItemTooltip( VALUE_HEADER, localizeText(dialogExploreValues) )
+        exp.lo.SetItemValue( ENDIAN_PRM, localizeText(dialogExploreEndian) )
 
-    exp.lo.SetItemValue( ENDIAN_PRM, localizeText(dialogExploreEndian) )
+        endianNames, endian, endianChanged := exp.getEndianessControl( )
+        exp.lo.SetItemChoices( BIG_ENDIAN_NAME, endianNames, endian, endianChanged )
 
-    endianNames, endian, endianChanged := exp.getEndianessControl( )
-    exp.lo.SetItemChoices( BIG_ENDIAN_NAME, endianNames, endian, endianChanged )
+        exp.lo.SetItemTooltip( BIG_ENDIAN_NAME, tooltipSL )
 
-    exp.lo.SetItemTooltip( BIG_ENDIAN_NAME, tooltipSL )
+        exp.lo.SetItemValue( INT_HEADER, localizeText(dialogExploreInt) )
+        exp.lo.SetItemValue( SIGNED_INT, localizeText(dialogExploreSigned) )
+        exp.lo.SetItemValue( UNSIGNED_INT, localizeText(dialogExploreUnsigned) )
+        exp.lo.SetItemValue( HEXA_INT, localizeText(dialogExploreHexa) )
+        exp.lo.SetItemValue( OCTAL_INT, localizeText(dialogExploreOctal) )
 
-    exp.lo.SetItemValue( INT_HEADER, localizeText(dialogExploreInt) )
-    exp.lo.SetItemValue( SIGNED_INT, localizeText(dialogExploreSigned) )
-    exp.lo.SetItemValue( UNSIGNED_INT, localizeText(dialogExploreUnsigned) )
-    exp.lo.SetItemValue( HEXA_INT, localizeText(dialogExploreHexa) )
-    exp.lo.SetItemValue( OCTAL_INT, localizeText(dialogExploreOctal) )
+        exp.lo.SetItemValue( INT8, localizeText(dialogExploreInt8) )
+        exp.lo.SetItemTooltip( S8, tooltipCC )
+        exp.lo.SetItemTooltip( U8, tooltipCC )
+        exp.lo.SetItemTooltip( H8, tooltipCC )
+        exp.lo.SetItemTooltip( O8, tooltipCC )
 
-    exp.lo.SetItemValue( INT8, localizeText(dialogExploreInt8) )
-    exp.lo.SetItemTooltip( S8, tooltipCC )
-    exp.lo.SetItemTooltip( U8, tooltipCC )
-    exp.lo.SetItemTooltip( H8, tooltipCC )
-    exp.lo.SetItemTooltip( O8, tooltipCC )
+        exp.lo.SetItemValue( INT16, localizeText(dialogExploreInt16) )
+        exp.lo.SetItemTooltip( S16, tooltipCC )
+        exp.lo.SetItemTooltip( U16, tooltipCC )
+        exp.lo.SetItemTooltip( H16, tooltipCC )
+        exp.lo.SetItemTooltip( O16, tooltipCC )
 
-    exp.lo.SetItemValue( INT16, localizeText(dialogExploreInt16) )
-    exp.lo.SetItemTooltip( S16, tooltipCC )
-    exp.lo.SetItemTooltip( U16, tooltipCC )
-    exp.lo.SetItemTooltip( H16, tooltipCC )
-    exp.lo.SetItemTooltip( O16, tooltipCC )
+        exp.lo.SetItemValue( INT32, localizeText(dialogExploreInt32) )
+        exp.lo.SetItemTooltip( S32, tooltipCC )
+        exp.lo.SetItemTooltip( U32, tooltipCC )
+        exp.lo.SetItemTooltip( H32, tooltipCC )
+        exp.lo.SetItemTooltip( O32, tooltipCC )
 
-    exp.lo.SetItemValue( INT32, localizeText(dialogExploreInt32) )
-    exp.lo.SetItemTooltip( S32, tooltipCC )
-    exp.lo.SetItemTooltip( U32, tooltipCC )
-    exp.lo.SetItemTooltip( H32, tooltipCC )
-    exp.lo.SetItemTooltip( O32, tooltipCC )
+        exp.lo.SetItemValue( INT64, localizeText(dialogExploreInt64) )
+        exp.lo.SetItemTooltip( S64, tooltipCC )
+        exp.lo.SetItemTooltip( U64, tooltipCC )
+        exp.lo.SetItemTooltip( H64, tooltipCC )
+        exp.lo.SetItemTooltip( O64, tooltipCC )
 
-    exp.lo.SetItemValue( INT64, localizeText(dialogExploreInt64) )
-    exp.lo.SetItemTooltip( S64, tooltipCC )
-    exp.lo.SetItemTooltip( U64, tooltipCC )
-    exp.lo.SetItemTooltip( H64, tooltipCC )
-    exp.lo.SetItemTooltip( O64, tooltipCC )
+        exp.lo.SetItemValue( REAL_HEADER, localizeText(dialogExploreReal) )
+        exp.lo.SetItemValue( REAL32, localizeText(dialogExploreFloat32) )
+        exp.lo.SetItemTooltip( F32, tooltipCC )
 
-    exp.lo.SetItemValue( REAL_HEADER, localizeText(dialogExploreReal) )
-    exp.lo.SetItemValue( REAL32, localizeText(dialogExploreFloat32) )
-    exp.lo.SetItemTooltip( F32, tooltipCC )
-
-    exp.lo.SetItemValue( REAL64, localizeText(dialogExploreFloat64) )
-    exp.lo.SetItemTooltip( F64, tooltipCC )
+        exp.lo.SetItemValue( REAL64, localizeText(dialogExploreFloat64) )
+        exp.lo.SetItemTooltip( F64, tooltipCC )
+    }
+    return false
 }
 
 func refreshExploreDialogsLanguage( ) {
-    for _, exp := range exploreDialogs {
-        exp.refreshLanguage( )
-    }
+    layout.VisitDialogs( refreshExploreLanguage )
 }
 
 func refreshDialogs( ) {

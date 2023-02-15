@@ -6,6 +6,16 @@ import (
 	"github.com/gotk3/gotk3/cairo"
 )
 
+const (
+    MIN_FONT_SIZE = 9
+    MAX_FONT_SIZE = 25
+    FONT_SIZE_INC = 2
+)
+
+func getFontNames( ) []string {
+    return []string{"Courier 10 Pitch", "Liberation Mono", "Monospace"}
+}
+
 type fontContext struct  {
     slant               cairo.FontSlant
     weight              cairo.FontWeight

@@ -180,6 +180,7 @@ const (
 
     tooltipCloseFile
 
+    tooltipGoto
     tooltipNext
     tooltipPrevious
 
@@ -437,6 +438,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Close file",                                           // tooltipCloseFile
 
+    "Enter byte address",                                   // tooltipGoto
     "Go to next match",                                     // tooltipNext
     "Go to previous match",                                 // tooltipPrevious
 
@@ -633,6 +635,7 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Fermer le fichier",                                    // tooltipCLoseFile
 
+    "Entrer l'adresse de l'octet",                          // tooltipGoto
     "Aller à la correspondance suivante",                   // tooltipNext
     "Aller à la correspondance précédente",                 // tooltipPrevious
 

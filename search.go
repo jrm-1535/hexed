@@ -14,14 +14,9 @@ import (
 const (
     MAX_SELECTION_LENGTH = 63                   // in bytes
     MAX_TEXT_LENGTH = 2 * MAX_SELECTION_LENGTH  // in nibbles
-    MAX_HISTORY = 10                            // slots in history slices
+    MAX_HISTORY_DEPTH = 10
     REPLACE_GRID_ROW = 1
 )
-
-type history struct {
-    store           []string                // previous search/replace entries
-    nInStore        int                     // store use [0:nInstore]
-}
 
 var (
     searchArea      *layout.Layout          // search and replace area
@@ -29,31 +24,8 @@ var (
     replaceVisible  bool                    // search only or search+replace
 
     searchHistory,
-    replaceHistory  history                 // search and replace histories
+    replaceHistory  *layout.History         // search and replace histories
 )
-
-func (h *history) update( text string ) []string {
-    if h.nInStore > 0 {
-        for i := 0; i < h.nInStore; i++ {   // check if already in history
-            if text == h.store[i] {
-                if i > 0 {                  // move store[i] -> store[0]
-                    entry := h.store[i]
-                    copy ( h.store[1:i+1], h.store[0:i] )
-                    h.store[0] = entry      // and update comboText
-                    return h.store[0:h.nInStore]
-                } else {                    // same as before, no update needed
-                    return h.store[0:0]
-                }
-            }
-        }                                   // not found in history, make room
-        copy( h.store[1:MAX_HISTORY], h.store[0:h.nInStore] )
-    }
-    h.store[0] = text                       // store new entry
-    if h.nInStore < MAX_HISTORY {
-        h.nInStore ++
-    }
-    return h.store[0:h.nInStore]            // and update comboText
-}
 
 func appendSearchText( ) {
     value, err := searchArea.GetItemValue( "searchInp" )
@@ -61,7 +33,7 @@ func appendSearchText( ) {
         log.Fatalf("appendSearchText: can't get search input\n")
     }
     text := value.(string)
-    choices := (&searchHistory).update( text )
+    choices := searchHistory.Update( text )
     if len( choices ) > 0 {
         searchArea.SetItemChoices( "searchInp", choices, 0, incrementalSearch )
     }
@@ -73,14 +45,13 @@ func appendReplaceText( ) {
         log.Fatalf("appendReplaceText: can't get search input\n")
     }
     text := value.(string)
-    choices := (&replaceHistory).update( text )
+    choices := replaceHistory.Update( text )
     if len( choices ) > 0 {
         searchArea.SetItemChoices( "replaceInp", choices, 0, updateReplaceTooltip )
     }
 }
 
 func keyPress( name string, key uint, mod layout.KeyModifier ) bool {
-    log.Printf("keyPress: key %#4x modifier %#2x on %s\n", key, mod, name )
     return layout.HexaFilter( key, mod )
 }
 
@@ -90,9 +61,14 @@ const (
 )
 
 func newSearchReplaceArea( ) *gtk.Widget {
+    var err error
 
-    searchHistory.store = make( []string, MAX_HISTORY )
-    replaceHistory.store = make( []string, MAX_HISTORY )
+    if searchHistory, err = layout.NewHistory( MAX_HISTORY_DEPTH ); err == nil {
+        replaceHistory, err = layout.NewHistory( MAX_HISTORY_DEPTH )
+    }
+    if err != nil {
+        log.Fatalf( "newSearchReplaceArea: Unable to create history: %v\n", err )
+    }
 
     const (
         COL_SPACING uint = 0
@@ -178,7 +154,6 @@ func newSearchReplaceArea( ) *gtk.Widget {
                                               },
                         }
 
-    var err error
     searchArea, err = layout.MakeLayout( &gd )
     if err != nil {
         log.Fatalf( "newSearchReplaceArea: Unable to create layout: %v\n", err )

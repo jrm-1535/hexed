@@ -11,6 +11,28 @@ import (
 	"github.com/gotk3/gotk3/cairo"
 )
 
+const (
+    MIN_BYTES_PER_LINE_LOWER_BOUNDARY = 8
+    MIN_BYTES_PER_LINE_HIGHER_BOUNDARY = 32 // > MIN_BYTES_PER_LINE_LOWER_BOUNDARY
+    MIN_BYTES_PER_LINE_INCREMENT_STEP = 4   // MIN_BYTES_PER_LINE_LOWER_BOUNDARY divisor
+
+    MAX_BYTES_PER_LINE_LOWER_BOUNDARY = 32  // >= MIN_BYTES_PER_LINE_HIGHER_BOUNDARY
+    MAX_BYTES_PER_LINE_HIGHER_BOUNDARY = 64 // > MAX_BYTES_PER_LINE_LOWER_BOUNDARY
+    MAX_BYTES_PER_LINE_INCREMENT_STEP = 4   // MAX_BYTES_PER_LINE_LOWER_BOUNDARY divisor
+
+    BYTES_INCREMENT_LOWER_BOUNDARY = 4
+    BYTES_INCREMENT_HIGHER_BOUNDARY = 16    // > BYTES_INCREMENT_LOWER_BOUNDARY
+    BYTES_INCREMENT_INCREMENT_STEP = 2      // BYTES_INCREMENT_LOWER_BOUNDARY divisor
+
+    BYTES_SEPARATOR_LOWER_BOUNDARY = 0
+    BYTES_SEPARATOR_HIGHER_BOUNDARY = 16    // > BYTES_SEPARATOR_LOWER_BOUNDARY
+    BYTES_SEPARATOR_INCREMENT_STEP = 4      // BYTES_SEPARATOR_LOWER_BOUNDARY divisor
+
+    LINES_SEPARATOR_LOWER_BOUNDARY = 0
+    LINES_SEPARATOR_HIGHER_BOUNDARY = 32    // > LINES_SEPARATOR_LOWER_BOUNDARY
+    LINES_SEPARATOR_INCREMENT_STEP = 8      // LINES_SEPARATOR_LOWER_BOUNDARY divisor
+)
+
 type direction int
 const (
     LEFT direction = iota-1
@@ -50,7 +72,7 @@ type pageContext struct {
     caretPos            int64       // in 1/2 byte within data bytes
 
     search              bool
-    hideCaret           bool        // when area is not in focus (during search)
+    hideCaret           bool        // when grid is not in focus (during search)
 
     replaceMode         bool        // false for insert mode
     readOnly            bool        // false if file modification can be allowed
@@ -769,6 +791,11 @@ func (pc *pageContext) scrollPositionFollowCaret( pos int64 ) {
     pc.showBytePosition()
 }
 
+func getCurrentPos( ) int64 {
+    pc := getCurrentPageContext()
+    return pc.caretPos
+}
+
 func gotoPos( pos int64 ) {
     requestPageFocus( )
     pc := getCurrentPageContext()
@@ -856,7 +883,7 @@ func (pc *pageContext) processAreaSizeChange( width, height int ) {
     if pc.width != width {
         pc.width = width
 
-        nBytesLine, nLines := pc.updateLineSizeFromAreaSize( width )
+        nBytesLine, nLines := pc.updateDataGridFromAreaWidth( width )
         pc.updateScrollFromDataGridChange( nBytesLine, nLines )
     }
     if pc.height != height {
@@ -1158,7 +1185,7 @@ func (pc *pageContext) isPageModified( path string ) bool {
 // 1 line contains the address field (addlen), 1 space,
 // (3 char) * nBytesLine, (1 char) * nBytesLines:
 // <--adlen--> <xx xx ... (*nBytesLine) ... xx ><a ... (*nBytesLine)>
-func (pc *pageContext) getAreaSize( nBL int ) (w, h int) {
+func (pc *pageContext) getMinAreaSizeFromGridBytesLine( nBL int ) (w, h int) {
     cw, ch, cd := getCharSizes( )
     w = (pc.addLen + 1 + (4 * nBL)) * cw
     h = cd + ch
@@ -1166,14 +1193,14 @@ func (pc *pageContext) getAreaSize( nBL int ) (w, h int) {
 }
 
 func (pc *pageContext) getMinAreaSize( ) (int, int) {
-    return pc.getAreaSize( getIntPreference( MIN_BYTES_LINE ) )
+    return pc.getMinAreaSizeFromGridBytesLine( getIntPreference( MIN_BYTES_LINE ) )
 }
 
 // Changing the line size changes also the number of lines
-func (pc *pageContext) updateLineSizeFromAreaSize( totalWidth int ) (nBL int, nL int64 ) {
+func (pc *pageContext) updateDataGridFromAreaWidth( totalWidth int ) (nBL int, nL int64 ) {
 // Starting from the minimum line size in bytes, its size can be incremented
 // only by a multiple of a fixed amount.
-    printDebug( "updateLineSizeFromAreaSize: totalWidth=%d, current nBytesLine=%d, nLines=%d\n",
+    printDebug( "updateDataGridFromAreaWidth: totalWidth=%d, current nBytesLine=%d, nLines=%d\n",
                 totalWidth, pc.nBytesLine, pc.nLines )
     cw := getCharWidth( )
     nBL = getIntPreference( MIN_BYTES_LINE )
@@ -1191,12 +1218,21 @@ func (pc *pageContext) updateLineSizeFromAreaSize( totalWidth int ) (nBL int, nL
         }
     }
     if nBL != pc.nBytesLine {
+        nBLPref := preferences{}
+        nBLPref[BYTES_LINE] = nBL
+        update( nBLPref )       // update preferences with new grid def
+
         nL = pc.calculateNumberOfLines( nBL )
-        printDebug("updateLineSizeFromAreaSize: new nBytesLine=%d, nLines=%d\n", nBL, nL)
+        printDebug("updateDataGridFromAreaWidth: new nBytesLine=%d, nLines=%d\n", nBL, nL)
     } else {
         nL = pc.nLines
     }
     return
+}
+
+func (pc *pageContext)getInitialDataGrid( ) (nBl int, nL int64) {
+    nBL := getIntPreference( BYTES_LINE )
+    return nBL, pc.calculateNumberOfLines( nBL )
 }
 
 func (pc *pageContext) calculateNumberOfLines( nBL int ) int64 {
@@ -1274,7 +1310,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     minWidth, minHeight := pc.getMinAreaSize()
     pc.canvas.SetSizeRequest( minWidth, minHeight )
 
-    nBytesLine, nLines := pc.updateLineSizeFromAreaSize( 0 )
+    nBytesLine, nLines := pc.getInitialDataGrid( )
     pc.updateScrollFromDataGridChange( nBytesLine, nLines )
 
     printDebug( "init: nBytesLine=%d, nLines=%d, minWidth=%d\n",
@@ -1364,11 +1400,13 @@ func (pc *pageContext)activate( ) {
     return
 }
 
-func getPageDefaultSize( ) (minWidth, minHeight int) {
+func getPageDefaultSize( ) (width, height int) {
     charWidth := getCharWidth()
-    minNBL := getIntPreference( MIN_BYTES_LINE )
-    minWidth = (6 + ( minNBL * 4 ) + 3 ) * charWidth
-    minHeight = 500
+    nBL := getIntPreference( BYTES_LINE )
+    width = (6 + 3 + ( nBL * 4 ) ) * charWidth
+    height = 500
+    printDebug("getPageDefaultSize: charWidth=%d nBL=%d Width=%d, Height=%d\n",
+               charWidth, nBL, width, height)
     return
 }
 
@@ -1376,7 +1414,8 @@ func updateLineSizeFromPreferencesChange( ) {
     if pc := getCurrentWorkAreaPageContext(); pc != nil {
         minNBL := getIntPreference( MIN_BYTES_LINE )
         maxNBL := getIntPreference( MAX_BYTES_LINE )
-
+fmt.Printf("updateLineSizeFromPreferencesChange: minNBL=%d maxNBL=%d NBL=%d\n",
+            minNBL, maxNBL, pc.nBytesLine)
         var nBL int
         if pc.nBytesLine < minNBL {
             nBL = minNBL
@@ -1384,19 +1423,26 @@ func updateLineSizeFromPreferencesChange( ) {
             nBL = maxNBL
         } else {
             nBLInc := getIntPreference( LINE_BYTE_INC )
+fmt.Printf("updateLineSizeFromPreferencesChange: NBLInc=%d\n", nBLInc)
             offset := (pc.nBytesLine - minNBL) % nBLInc
             if offset != 0 {
                 nBL = minNBL + (pc.nBytesLine - minNBL) / nBLInc
                 if offset > nBLInc / 2 {
                     nBL += nBLInc
                 }
+fmt.Printf("updateLineSizeFromPreferencesChange: NBL=%d\n", nBL)
             } else {        // no effect on nBytesLine
+fmt.Printf("updateLineSizeFromPreferencesChange: no effect\n")
                 minWidth, minHeight := pc.getMinAreaSize()
                 pc.canvas.SetSizeRequest( minWidth, minHeight )
+setWidth, setHeight := pc.canvas.GetSizeRequest( )
+fmt.Printf("updateLineSizeFromPreferencesChange: set width, height = (%d, %d)\n",
+            setWidth, setHeight)
                 return
             }
         }
         nL := pc.calculateNumberOfLines( nBL )
+fmt.Printf("updateLineSizeFromPreferencesChange: n Lines=%d\n", nL)
         minWidth, minHeight := pc.getMinAreaSize()
         pc.canvas.SetSizeRequest( minWidth, minHeight )
         pc.updateScrollFromDataGridChange( nBL, nL )
@@ -1424,7 +1470,6 @@ func initPagesContext( ) {
         redrawPage()
     }
     registerForChanges( COLOR_THEME_NAME, updateColors )
-
 }
 
 func newPageContent( name string, readOnly bool ) (content *gtk.Widget,

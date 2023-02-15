@@ -35,7 +35,6 @@ func initActions( nItems int ) {
     actions["open"] = func( ) {
         fileName := openFileName( )
         if fileName != "" {
-            printDebug( "Action: Open File %s\n", fileName )
             newPage( fileName, false )
         }
     }
@@ -67,15 +66,7 @@ func initActions( nItems int ) {
 
     actions["find"] = searchDialog
     actions["replace"] = replaceDialog
-
-    gotoAction := func( ) {
-        op, pos := gotoDialog()
-        printDebug( "Action: goto called for position %d\n", pos )
-        if op == DO && pos >= 0 {
-            gotoPos( pos )
-        }
-    }
-    actions["goto"] = gotoAction
+    actions["goto"] = gotoDialog
 
     helpAction := func ( ) {
         printDebug( "Action: help content called\n" )
