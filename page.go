@@ -5,6 +5,7 @@ import (
     "log"
 //    "strings"
     "os"
+    "internal/edit"
 
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
@@ -59,7 +60,7 @@ type pageContext struct {
     scrollBar           *gtk.Scrollbar
     pageBox             *gtk.Box
 
-    store               *storage
+    store               *edit.Storage
 
     width, height       int         // canvas size    
 
@@ -113,19 +114,19 @@ func (pc *pageContext) getSelection() ( s, l int64) {
 
 func getBytesAtCaret( nBytes int64 ) (data[]byte, nibblePos int64) {
     pc := getCurrentPageContext()
-    byteLen := pc.store.length()
+    byteLen := pc.store.Length()
     bytePos := pc.caretPos >> 1
     if nBytes == 0 || bytePos + nBytes > byteLen {
         nBytes = byteLen - bytePos
     }
-    data = pc.store.getData( bytePos, bytePos + nBytes )
+    data = pc.store.GetData( bytePos, bytePos + nBytes )
     nibblePos = pc.caretPos
     return
 }
 
 func getByteSizeFromCaret( ) int64 {
     pc := getCurrentPageContext()
-    byteLen := pc.store.length()
+    byteLen := pc.store.Length()
     bytePos := pc.caretPos >> 1
     return byteLen - bytePos
 }
@@ -141,7 +142,7 @@ func copySelection( ) {
     s, l := pc.getSelection()
     if s != -1 {
         log.Printf( "copySelection [%d, %d[ (caret=%d)\n", s, s+l, pc.caretPos)
-        pc.store.copyBytesAt( s, l )
+        pc.store.CopyBytesAt( s, l )
     }
 }
 
@@ -150,19 +151,19 @@ func cutSelection( ) {
     s, l := pc.getSelection()
     if s != -1 {
         log.Printf( "cutSelection [%d, %d[ (caret=%d)\n", s, s+l, pc.caretPos)
-        pc.store.cutBytesAt( s, 0, l )
+        pc.store.CutBytesAt( s, 0, l )
         pc.resetSelection( )
         pc.canvas.QueueDraw( )    // force redraw
     }
 }
 
 func pasteClipboard( ) {
-    if avail, cb := isClipboardDataAvailable(); avail {
+    if avail := isClipboardDataAvailable(); avail {
         pc := getCurrentPageContext()
         s, l := pc.getSelection()
         if s != -1 {    // valid current selection to replace with clipboard
             log.Printf( "pasteClipboard: replace selection [%d,%d[\n", s, s+l )
-            err := pc.store.replaceWithClipboardAt( s, 0, l, cb )
+            err := pc.store.ReplaceWithClipboardAt( s, 0, l )
             if err != nil {
                 log.Panicln("pasteClipboard: failed to replace selection")
             }
@@ -171,16 +172,17 @@ func pasteClipboard( ) {
             bytePos := pc.caretPos >> 1
             log.Printf("pasteClipboard: insert at caret pos=%d\n", bytePos )
             if pc.caretPos & 1 == 0 {   // if caret is even, just insert as is
-                pc.store.insertClipboardAt( bytePos, pc.caretPos & 1, cb )
+                pc.store.InsertClipboardAt( bytePos, pc.caretPos & 1 )
             } else {    // otherwise, replace 2 nibbles with clipbard data:
                 // clipboard: 12 34 56
                 // current  : .. .. ab cd ....
                 // carret            ^
                 // result   : .. .. a1 23 45 6b cd ..
                 // requires to set a heading and a trailing nibble
-                b := pc.store.getData( bytePos, bytePos + 1 )
+                b := pc.store.GetData( bytePos, bytePos + 1 )
+                cb := getClipboard()
                 cb.setExtraNibbles( b[0] )
-                pc.store.replaceWithClipboardAt( bytePos, 1, 1, cb )
+                pc.store.ReplaceWithClipboardAt( bytePos, 1, 1 )
             }
         }
         pc.canvas.QueueDraw( )    // force redraw
@@ -197,7 +199,7 @@ func pasteClipboard( ) {
 func undoLast( ) {
     log.Println( "undoLast" )
     pc := getCurrentPageContext()
-    pos, tag, err := pc.store.undo()
+    pos, tag, err := pc.store.Undo()
     if err != nil {
         log.Panicf( "undoLast: failed to undo: %v\n", err )
     }
@@ -208,7 +210,7 @@ func undoLast( ) {
 func redoLast( ) {
     log.Println( "redoLast" )
     pc := getCurrentPageContext()
-    pos, tag, err := pc.store.redo()
+    pos, tag, err := pc.store.Redo()
     if err != nil {
         log.Panicf( "redoLast: failed to undo: %v\n", err )
     }
@@ -228,7 +230,7 @@ func selectAll( ) {
     pc := getCurrentPageContext()
     pc.setCaretPosition( -1, END )    // set caret at 0
     pc.sel.start = 0
-    pc.sel.beyond = pc.store.length()
+    pc.sel.beyond = pc.store.Length()
     pc.validateSelection( )
     pc.canvas.QueueDraw( )    // force redraw
 }
@@ -486,7 +488,7 @@ func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down 
         row, up, down = pc.getDataRow( y )
         index = pc.getDataNibbleIndexFromHex( x, row )
     }
-    maxIndex := 2 * pc.store.length()
+    maxIndex := 2 * pc.store.Length()
     if index > maxIndex {
         index = maxIndex
     }
@@ -494,7 +496,7 @@ func (pc *pageContext)getDataNibbleIndex( x, y float64 ) (index int64, up, down 
 }
 
 func (pc *pageContext) showContextPopup( event  *gdk.Event ) {
-    clipboardAvail, _ := isClipboardDataAvailable()
+    clipboardAvail := isClipboardDataAvailable()
     var aNames []string
 
     if pc.sel.start == -1 {
@@ -563,7 +565,7 @@ func (pc *pageContext) extendSelection( x, y float64 ) {
     index, up, down := pc.getDataNibbleIndex( x, y )
     if -1 != index {
         index /= 2          // in data bytes
-        if index == pc.store.length() {
+        if index == pc.store.Length() {
             index --
         }
         prevStart := pc.sel.start
@@ -844,7 +846,7 @@ func (pc *pageContext) updateScrollFromDataGridChange( nBytesLine int,
         printDebug("updateScrollFromDataGridChange: new line count=%d\n", nLines)
         pc.nLines = nLines
     }
-    if pc.store.length() % int64(pc.nBytesLine) == 0 { // force 1 extra row
+    if pc.store.Length() % int64(pc.nBytesLine) == 0 { // force 1 extra row
         nLines ++
     }
 
@@ -977,7 +979,7 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
     pc.drawDataBackground( cr )
 
     nBL := pc.nBytesLine
-    dataLen := pc.store.length()
+    dataLen := pc.store.Length()
 
     inc := int64(nBL)
     if inc > dataLen {
@@ -1007,7 +1009,7 @@ func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
         if beyond > dataLen {
             beyond = dataLen
         }
-        line := pc.store.getData( address, beyond )
+        line := pc.store.GetData( address, beyond )
         setHexForegroundColor( cr )
         var ( i int; d byte )
         for i, d = range line {
@@ -1079,12 +1081,12 @@ func (pc *pageContext)setStorage( path string ) (err error) {
         printDebug("updateStoreLength: nLines.previous=%d, .new=%d\n", pc.nLines, nLines )
         pc.updateScrollFromDataGridChange( pc.nBytesLine, nLines )
     }
-    pc.store, err = initStorage( path )
+    pc.store, err = edit.InitStorage( path, getClipboard() )
     if err == nil {
-        pc.store.setNotifyDataChange( updateSearch )
-        pc.store.setNotifyLenChange( updateStoreLength )
-        pc.store.setNotifyUndoRedoAble( undoRedoUpdate )
-        l := pc.store.length()
+        pc.store.SetNotifyDataChange( updateSearch )
+        pc.store.SetNotifyLenChange( updateStoreLength )
+        pc.store.SetNotifyUndoRedoAble( undoRedoUpdate )
+        l := pc.store.Length()
         dataExists( l > 0 )
         explorePossible( pc.caretPos < ( l << 1 ) )
     }
@@ -1100,7 +1102,7 @@ func refreshPageStatus( ) {
 }
 
 func (pc *pageContext)reloadContent( path string ) {
-    err := pc.store.reload( path )
+    err := pc.store.Reload( path )
     if err == nil {
         pc.setCaretPosition( -1, END )  // set caret at 0
         pc.showBytePosition()
@@ -1123,15 +1125,15 @@ func (pc *pageContext) refresh( ) {
 
     // clipboard data availability does not depend on page but paste is
     // only possible if the current page is not read only.
-    clipboardAvail, _ := isClipboardDataAvailable()
+    clipboardAvail := isClipboardDataAvailable()
     pasteDataExists( clipboardAvail )
 
     // data available for saving or reversing depends on page storage
-    dataExists( pc.store.length() > 0 )
+    dataExists( pc.store.Length() > 0 )
     // selection data available depends on page selection validity
     pc.validateSelection()
     // undo/redo status depends on storage state
-    undoRedoUpdate( pc.store.areUndoRedoPossible() )
+    undoRedoUpdate( pc.store.AreUndoRedoPossible() )
     // protection switch depends on read only status
     modificationAllowed( ! pc.readOnly, ! pc.tempReadOnly )
     // update pattern matches
@@ -1147,7 +1149,7 @@ func (pc *pageContext) setTempReadOnly( readOnly bool ) {
         pc.tempReadOnly = readOnly
         showReadOnly( pc.tempReadOnly )
         showInputMode( pc.tempReadOnly, pc.replaceMode )
-        clipboardAvail, _ := isClipboardDataAvailable()
+        clipboardAvail := isClipboardDataAvailable()
         pasteDataExists( clipboardAvail )
         selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
     }
@@ -1157,10 +1159,10 @@ func (pc *pageContext) isPageModified( path string ) bool {
     if pc.readOnly {
         return false
     }
-    if path == "" && 0 == pc.store.length() {
+    if path == "" && 0 == pc.store.Length() {
         return false
     }
-    return ! pc.virgin && pc.store.isDirty( )
+    return ! pc.virgin && pc.store.IsDirty( )
 }
 
 // Each line is broken up in 3 parts, the address part, the hexadecimal one
@@ -1236,7 +1238,7 @@ func (pc *pageContext)getInitialDataGrid( ) (nBl int, nL int64) {
 }
 
 func (pc *pageContext) calculateNumberOfLines( nBL int ) int64 {
-    dataLen := pc.store.length()  // update area height
+    dataLen := pc.store.Length()  // update area height
     return (dataLen + int64((nBL-1))) / int64(nBL)
 }
 
@@ -1245,7 +1247,7 @@ func (pc *pageContext)init( path string, readOnly bool ) (err error) {
     if err = pc.setStorage( path ); err != nil {
         return
     }
-    dataLen := pc.store.length()
+    dataLen := pc.store.Length()
 
     pc.readOnly = readOnly
     if ! readOnly {
@@ -1350,7 +1352,7 @@ func getSelectionData( maxLen int64 ) ( sel []byte ) {
             if l > maxLen {
                 l = maxLen
             }
-            sel = pc.store.getData( s, s + l )
+            sel = pc.store.GetData( s, s + l )
         }
     }
     return
@@ -1361,7 +1363,7 @@ func pageGrabFocus( ) {
     if pc != nil {
         pc.canvas.GrabFocus( )
         pc.hideCaret = false
-        clipboardAvail, _ := isClipboardDataAvailable()
+        clipboardAvail := isClipboardDataAvailable()
         pasteDataExists( clipboardAvail )
         selectionDataExists( pc.sel.start != -1, pc.tempReadOnly )
     }
@@ -1496,9 +1498,9 @@ func (pc *pageContext) saveContentAs( path string ) (err error) {
                         backupPath, err )
         }
     }
-    l := pc.store.length()
+    l := pc.store.Length()
     if l > 0 {
-        err = os.WriteFile( path, pc.store.getData( 0, l ), 0666 )
+        err = os.WriteFile( path, pc.store.GetData( 0, l ), 0666 )
         if err == nil {
             pc.virgin = true
         }

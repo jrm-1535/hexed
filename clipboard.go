@@ -39,10 +39,14 @@ func initClipboard( ) {
     clipBoard.cb.Connect( "owner-change", ownerChanged )
 }
 
+func getClipboard( ) *hexClipboard {
+    return &clipBoard
+}
+
 // return whether data is available in the clipboard and if true, an interface
 // to access data. Must be called before any attempt at retreiving clipboard
 // data
-func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
+func isClipboardDataAvailable( ) bool {
     if clipBoard.cb == nil {
         log.Panicln("Hexed clipboard not initialized")
     }
@@ -56,11 +60,11 @@ func isClipboardDataAvailable( ) ( bool, *hexClipboard) {
     l := len(clipBoard.data)    // in bytes
     if l < 2 || (l & 1) != 0 {
         printDebug( "isClipboardAvailable: returns false (length %d)\n", l )
-        return false, nil
+        return false
     }
     clipBoard.index = 0
     clipBoard.extraValid = false
-    return true, &clipBoard
+    return true
 }
 
 // set an extra byte for prepending and appending nibbles in case of pasting
@@ -74,7 +78,7 @@ func (hcp *hexClipboard) setExtraNibbles( extra byte ) {
                 extra >> 4, extra & 0x0f )
 }
 
-func (hcp *hexClipboard)size() ( n int64 ) {
+func (hcp *hexClipboard) Size() ( n int64 ) {
     n = int64(len(hcp.data)) / 2    // in bytes
     if hcp.extraValid { // including extra 2 nibbles if extraByte is valid
         n ++
@@ -95,8 +99,8 @@ func getNibbleFromHexDigit( hc byte ) (nibble byte) {
 
 // TODO: when using WaitForContent with binary data (application/octet-stream) 
 // as content target, return directly 1 binary byte
-func (hcp *hexClipboard)get() byte {
-    l := hcp.size()
+func (hcp *hexClipboard) Get() byte {
+    l := hcp.Size()
 //fmt.Printf( "clipboard size=%d index=%d extra=%#02x valid=%v data=%v\n",
 //            l, hcp.index, hcp.extraByte, hcp.extraValid, hcp.data )
     if hcp.index >= 2 * l {
@@ -143,13 +147,13 @@ func writeHexDigitsFromSlice( out []byte, data []byte ) {
 }
 
 // save binary data bytes into hex chars
-func setClipboardData( data []byte ) {
+func (hcp *hexClipboard) Set( data []byte ) {
 // TODO: when available in gotk3, use setWithOwner instead of immediate copy here
     l := len( data )
     printDebug( "setClipboardData: data len=%d\n", l )
     b := make( []byte, l * 2 )  // 2 char per data byte
     writeHexDigitsFromSlice( b, data )
-    clipBoard.cb.SetText( string(b) )
+    hcp.cb.SetText( string(b) )
     pasteDataExists( true )
 }
 

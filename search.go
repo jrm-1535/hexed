@@ -405,7 +405,7 @@ func replaceMatch( name string, val interface{} ) bool {
     data := BytesFromHexString( l, text )
 
     pc := getCurrentPageContext()
-    pc.store.replaceBytesAt( searchPos, 0, matchSize, data )
+    pc.store.ReplaceBytesAt( searchPos, 0, matchSize, data )
     appendReplaceText()
     return findNext( "", nil )
 }
@@ -425,7 +425,7 @@ func replaceAllMatches( name string, val interface{}) bool {
     data := BytesFromHexString( l, text )
 
     pc := getCurrentPageContext()
-    pc.store.replaceBytesAtMultipleLocations( matches, 0, matchSize, data )
+    pc.store.ReplaceBytesAtMultipleLocations( matches, 0, matchSize, data )
 
     appendSearchText()
     appendReplaceText()
@@ -582,7 +582,7 @@ func (pc *pageContext) findPattern( ) {
 
     if l > 0 {
         for {
-            offset := bitapSearch( pc.store.getData( pos, pc.store.length() ),
+            offset := bitapSearch( pc.store.GetData( pos, pc.store.Length() ),
                                    pattern )
             if offset == -1 {
                 break
@@ -590,7 +590,7 @@ func (pc *pageContext) findPattern( ) {
             pos += offset
             matches = append( matches, pos )
             pos += toSkip
-            if pos >= pc.store.length() {
+            if pos >= pc.store.Length() {
                 break
             }
         }

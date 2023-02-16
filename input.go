@@ -21,7 +21,7 @@ func (pc *pageContext) setCaretPosition( offset int64,  unit int ) {
     pageSize := int64(adj.GetPageSize())
     pageNibbles := (pageSize / int64(getCharHeight())) *
                                     int64(pc.nBytesLine << 1)
-    dataNibbles := pc.store.length() << 1
+    dataNibbles := pc.store.Length() << 1
 
     if pc.sel.start != -1 {
         if unit < END && offset == 1  {     // next char, line or page starts at
@@ -159,7 +159,7 @@ func (pc *pageContext) insertEvenCaretNoPending( nibble byte ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.insertByteAt( bPos, 1 << 2, nibble << 4 )
+    pc.store.InsertByteAt( bPos, 1 << 2, nibble << 4 )
     pc.caretPos ++
     pc.setOddCaretPendingInsert()
 }
@@ -172,11 +172,11 @@ func (pc *pageContext) insertEvenCaretPendingInsert( nibble byte ) {
 //          ==            no pending op
 //           ^            move caret + 1 (odd)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     nb := data[0] | nibble << 4
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.replaceByteAt( bPos, 1 << 2, nb )
+    pc.store.ReplaceByteAt( bPos, 1 << 2, nb )
     pc.caretPos ++
     pc.setOddCaretNoPending()
 }
@@ -192,7 +192,7 @@ func (pc *pageContext) insertEvenCaretPendingDelete( nibble byte ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.insertByteAt( bPos, 1 << 2, nibble << 4 )
+    pc.store.InsertByteAt( bPos, 1 << 2, nibble << 4 )
     pc.caretPos ++
     pc.setOddCaretPendingInsert()
 }
@@ -206,11 +206,11 @@ func (pc *pageContext) insertEvenCaretPendingBackspace( nibble byte ) {
 //       ==               no pending op
 //        ^               move caret + 1 (odd)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     nb := data[0] | nibble << 4     // to allow undo
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.replaceByteAt( bPos, 1 << 2,  nb )
+    pc.store.ReplaceByteAt( bPos, 1 << 2,  nb )
     pc.caretPos ++
     pc.setOddCaretNoPending()
 }
@@ -223,7 +223,7 @@ func (pc *pageContext) insertOddCaretNoPending( nibble byte ) {
 //       == ++            pending op = insert
 //          ^             move caret + 1 (even)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := (data[0] & 0xf0) | nibble
     nb := data[0] & 0x0f
     res := make( []byte, 2 )
@@ -231,7 +231,7 @@ func (pc *pageContext) insertOddCaretNoPending( nibble byte ) {
     res[1] = nb
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceBytesAt( bPos, 1 | (2 << 2), 1, res )
+    pc.store.ReplaceBytesAt( bPos, 1 | (2 << 2), 1, res )
     pc.caretPos ++
     pc.setEvenCaretPendingInsert( )
 }
@@ -244,11 +244,11 @@ func (pc *pageContext) insertOddCaretPendingInsert( nibble byte ) {
 //          ==            no pending op
 //             ^          move caret + 1 (even)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0] | nibble
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceByteAt( bPos, 1 | (2 << 2), ub )
+    pc.store.ReplaceByteAt( bPos, 1 | (2 << 2), ub )
     pc.caretPos ++
     pc.setEvenCaretNoPending( )
 }
@@ -264,7 +264,7 @@ func (pc *pageContext) insertOddCaretPendingDelete( nibble byte ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 <<2)
-    pc.store.insertByteAt( bPos, 1 | (2 <<2), nibble )
+    pc.store.InsertByteAt( bPos, 1 | (2 <<2), nibble )
     pc.caretPos ++
     pc.setEvenCaretPendingInsert( )
 }
@@ -278,11 +278,11 @@ func (pc *pageContext) insertOddCaretPendingBackspace( nibble byte ) {
 //       ==               no pending op
 //          ^             move caret + 1 (even)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0] | nibble
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceByteAt( bPos, 1 | (2 << 2), ub )
+    pc.store.ReplaceByteAt( bPos, 1 | (2 << 2), ub )
     pc.caretPos ++
     pc.setEvenCaretNoPending( )
 }
@@ -295,11 +295,11 @@ func (pc *pageContext) deleteEvenCaretNoPending( ) {
 //          ==            pending op = delete
 //           ^            move caret + 1 (odd)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0] & 0x0f
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.replaceByteAt( bPos, 1 << 2, ub )
+    pc.store.ReplaceByteAt( bPos, 1 << 2, ub )
     pc.caretPos ++
     pc.setOddCaretPendingDelete( )
 }
@@ -314,11 +314,11 @@ func (pc *pageContext) deleteEvenCaretPendingInsert( ) {
 //   Even though there is no change, we replace the current byte
 //   with itself to allow undoing/redoing and caret move.
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0]
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.replaceByteAt( bPos, 1 << 2, ub )
+    pc.store.ReplaceByteAt( bPos, 1 << 2, ub )
     pc.caretPos ++
     pc.setOddCaretPendingDelete( )
 }
@@ -331,15 +331,15 @@ func (pc *pageContext) deleteEvenCaretPendingDelete( ) {
 //       == --            no pending op
 //        ^               move caret - 1 (odd)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     nibble := data[0] & 0x0f
-    data = pc.store.getData( bPos - 1, bPos )
+    data = pc.store.GetData( bPos - 1, bPos )
     ub := data[0] | nibble
     rep := make( []byte, 1 )
     rep[0] = ub
 //   when undoing caret goes back to next even position: tag = 2
 //   when redoing caret moves 1 nibble ahead tag: = 2 | (1 << 2)
-    pc.store.replaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
+    pc.store.ReplaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
     pc.caretPos --
     pc.setOddCaretNoPending( )
 }
@@ -355,11 +355,11 @@ func (pc *pageContext) deleteEvenCaretPendingBackspace( ) {
 //   Even though there is no change, we replace the current byte
 //   with itself to allow undoing/redoing and caret move.
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0]
 //   when undoing caret goes back to same even position: tag = 0
 //   when redoing caret moves 1 nibble ahead: tag = 0 | (1 << 2)
-    pc.store.replaceByteAt( bPos, 1 << 2, ub )
+    pc.store.ReplaceByteAt( bPos, 1 << 2, ub )
     pc.caretPos ++
     pc.setOddCaretPendingDelete( )
 }
@@ -372,11 +372,11 @@ func (pc *pageContext) deleteOddCaretNoPending( ) {
 //       ==               pending op = delete
 //          ^             move caret + 1 (even)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0] & 0xf0
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceByteAt( bPos, 1 | (2 << 2), ub )
+    pc.store.ReplaceByteAt( bPos, 1 | (2 << 2), ub )
     pc.caretPos ++
     pc.setEvenCaretPendingDelete( )
 }
@@ -391,11 +391,11 @@ func (pc *pageContext) deleteOddCaretPendingInsert( ) {
 //   Even though there is no change, we replace the current byte
 //   with itself to allow undoing/redoing and caret move.
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0]
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceByteAt( bPos, 1 | (2 << 2), ub )
+    pc.store.ReplaceByteAt( bPos, 1 | (2 << 2), ub )
     pc.caretPos ++
     pc.setEvenCaretPendingDelete( )
 }
@@ -410,7 +410,7 @@ func (pc *pageContext) deleteOddCaretPendingDelete( ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret goes to the same even position: tag = 1 | (0 << 2)
-    pc.store.deleteByteAt( bPos, 1 )
+    pc.store.DeleteByteAt( bPos, 1 )
     pc.caretPos --
     pc.setEvenCaretNoPending( )
 }
@@ -426,11 +426,11 @@ func (pc *pageContext) deleteOddCaretPendingBackspace( ) {
 //   Even though there is no change, we replace the current byte
 //   with itself to allow undoing/redoing and caret move.
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0]
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret moves 2 nibbles ahead: tag = 1 | (2 << 2)
-    pc.store.replaceByteAt( bPos, 1 | (2 << 2), ub )
+    pc.store.ReplaceByteAt( bPos, 1 | (2 << 2), ub )
     pc.caretPos ++
     pc.setEvenCaretPendingDelete( )
 }
@@ -444,11 +444,11 @@ func (pc *pageContext) backspaceEvenCaretNoPending( ) {
 //        ^               move caret - 1 (odd)
     bPos := (pc.caretPos / 2) - 1
     if bPos >= 0 {
-        data := pc.store.getData( bPos, bPos + 1 )
+        data := pc.store.GetData( bPos, bPos + 1 )
         ub := data[0] & 0xf0
 //   when undoing caret goes back to next even position: tag = 2
 //   when redoing caret moves 1 nibble ahead: tag = 2 | (1 << 2)
-        pc.store.replaceByteAt( bPos, 2 | (1 << 2), ub )
+        pc.store.ReplaceByteAt( bPos, 2 | (1 << 2), ub )
         pc.caretPos --
         pc.setOddCaretPendingBackspace( )
     }
@@ -462,15 +462,15 @@ func (pc *pageContext) backspaceEvenCaretPendingInsert( ) {
 //       == --            no pending op
 //        ^               move caret -1 (odd)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     nibble := data[0] & 0x0f
-    data = pc.store.getData( bPos - 1, bPos )
+    data = pc.store.GetData( bPos - 1, bPos )
     ub := (data[0] & 0xf0) | nibble
     rep := make( []byte, 1 )
     rep[0] = ub
 //   when undoing caret goes back to next even position: tag = 2
 //   when redoing caret moves 1 nibble ahead: tag = 2 | (1 << 2)
-    pc.store.replaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
+    pc.store.ReplaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
     pc.caretPos --
     pc.setOddCaretNoPending( )
 }
@@ -486,11 +486,11 @@ func (pc *pageContext) backspaceEvenCaretPendingDelete( ) {
 //   with itself to allow undoing/redoing and caret move.
     if pc.caretPos > 0 {
         bPos := (pc.caretPos / 2) - 1
-        data := pc.store.getData( bPos, bPos + 1 )
+        data := pc.store.GetData( bPos, bPos + 1 )
         ub := data[0]
 //   when undoing caret goes back to next even position: tag = 2
 //   when redoing caret moves 1 nibble ahead: tag = 2 | (1 << 2)
-        pc.store.replaceByteAt( bPos, 2 | (1 << 2), ub )
+        pc.store.ReplaceByteAt( bPos, 2 | (1 << 2), ub )
         pc.caretPos --
         pc.setOddCaretPendingBackspace( )
     }
@@ -506,15 +506,15 @@ func (pc *pageContext) backspaceEvenCaretPendingBackspace( ) {
 //     ^                  move caret -1 (odd)
     if pc.caretPos > 0 {
         bPos := pc.caretPos / 2
-        data := pc.store.getData( bPos, bPos + 1 )
+        data := pc.store.GetData( bPos, bPos + 1 )
         nibble := data[0] & 0x0f
-        data = pc.store.getData( bPos - 1, bPos )
+        data = pc.store.GetData( bPos - 1, bPos )
         ub := (data[0] & 0xf0) | nibble
         rep := make( []byte, 1 )
         rep[0] = ub
 //   when undoing caret goes back to next even position: tag = 2
 //   when redoing caret moves 1 nibble ahead: tag = 2 | (1 << 2)
-        pc.store.replaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
+        pc.store.ReplaceBytesAt( bPos - 1, 2 | (1 << 2), 2, rep )
         pc.caretPos --
         pc.setOddCaretNoPending( )
     }
@@ -528,11 +528,11 @@ func (pc *pageContext) backspaceOddCaretNoPending( ) {
 //       ==               pending op = backspace
 //       ^                move caret - 1 (even)
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0] & 0x0f
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret goes back to same even position: tag = 1 | (0 << 2)
-    pc.store.replaceByteAt( bPos, 1, ub )
+    pc.store.ReplaceByteAt( bPos, 1, ub )
     pc.caretPos --
     pc.setOddCaretPendingBackspace( )
 }
@@ -547,7 +547,7 @@ func (pc *pageContext) backspaceOddCaretPendingInsert( ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret goes back to same even position: tag = 1 | (0 << 2)
-    pc.store.deleteByteAt( bPos, 1 )
+    pc.store.DeleteByteAt( bPos, 1 )
     pc.caretPos --
     pc.setEvenCaretNoPending( )
 }
@@ -562,11 +562,11 @@ func (pc *pageContext) backspaceOddCaretPendingDelete( ) {
 //   Even though there is no change, we replace the current byte
 //   with itself to allow undoing/redoing and caret move.
     bPos := pc.caretPos / 2
-    data := pc.store.getData( bPos, bPos + 1 )
+    data := pc.store.GetData( bPos, bPos + 1 )
     ub := data[0]
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret goes back to same even position: tag = 1 | (0 << 2)
-    pc.store.replaceByteAt( bPos, 1, ub )
+    pc.store.ReplaceByteAt( bPos, 1, ub )
     pc.caretPos --
     pc.setEvenCaretPendingBackspace( )
 }
@@ -582,7 +582,7 @@ func (pc *pageContext) backspaceOddCaretPendingBackspace( ) {
     bPos := pc.caretPos / 2
 //   when undoing caret goes back to same odd position: tag = 1
 //   when redoing caret goes back to same even position: tag = 1 | (0 << 2)
-    pc.store.deleteByteAt( bPos, 1 )
+    pc.store.DeleteByteAt( bPos, 1 )
     pc.caretPos --
     pc.setEvenCaretNoPending( )
 }
@@ -595,7 +595,7 @@ func (pc *pageContext)insCommand( nibble byte ) {
         pc.killOrCleanSelection( true, nibble )
     } else if pc.replaceMode {
         bPos := pc.caretPos / 2
-        data := pc.store.getData( bPos, bPos + 1 )
+        data := pc.store.GetData( bPos, bPos + 1 )
         var ( ub byte; tag int64 )
         if data != nil {
             ub = data[0]
@@ -614,9 +614,9 @@ func (pc *pageContext)insCommand( nibble byte ) {
             tag = 1 | (2 << 2)
         }
         if data != nil {
-            pc.store.replaceByteAt( bPos, tag, ub )
+            pc.store.ReplaceByteAt( bPos, tag, ub )
         } else {
-            pc.store.insertByteAt( bPos, tag, ub )
+            pc.store.InsertByteAt( bPos, tag, ub )
         }
         pc.caretPos ++
     } else {
@@ -643,20 +643,20 @@ func (pc *pageContext) killOrCleanSelection( add bool, nibble byte ) bool {
         tag := int64(1<<2)
         if pc.replaceMode {
             if add {
-                pc.store.replaceByteAtAndEraseFollowingBytes( s, tag, nibble << 4, l-1 )
+                pc.store.ReplaceByteAtAndEraseFollowingBytes( s, tag, nibble << 4, l-1 )
                 cp ++
             } else {
-                pc.store.replaceByteAtAndEraseFollowingBytes( s, 0, 0, l-1 )
+                pc.store.ReplaceByteAtAndEraseFollowingBytes( s, 0, 0, l-1 )
             }
         } else {
             if add {
                 rep := make( []byte, 1 )
                 rep[0] = nibble << 4
-                pc.store.replaceBytesAt( s, tag, l, rep )
+                pc.store.ReplaceBytesAt( s, tag, l, rep )
                 pc.setOddCaretPendingInsert()
                 cp ++
             } else {
-                pc.store.deleteBytesAt( s, 0, l )
+                pc.store.DeleteBytesAt( s, 0, l )
                 pc.setEvenCaretNoPending()
             }
         }
@@ -673,9 +673,9 @@ func (pc *pageContext)delCommand( ) {
     }
     if ! pc.killOrCleanSelection( false, 0 ) {
         bPos := pc.caretPos / 2
-        if bPos < pc.store.length() {
+        if bPos < pc.store.Length() {
             if pc.replaceMode {
-                data := pc.store.getData( bPos, bPos + 1 )
+                data := pc.store.GetData( bPos, bPos + 1 )
                 if data == nil {
                     return
                 }
@@ -688,7 +688,7 @@ func (pc *pageContext)delCommand( ) {
                     tag = 1 | (2 << 2)
                 }
 
-                pc.store.replaceByteAt( bPos, tag, ub )
+                pc.store.ReplaceByteAt( bPos, tag, ub )
                 pc.caretPos ++
             } else {
                 pc.del( pc )
@@ -708,7 +708,7 @@ func (pc *pageContext)backCommand( ) {
             if pc.replaceMode {
                 pc.caretPos --              // move caret 1 nibble backward
                 bPos := pc.caretPos / 2
-                data := pc.store.getData( bPos, bPos + 1)
+                data := pc.store.GetData( bPos, bPos + 1)
                 if data == nil {
                     return
                 }
@@ -720,7 +720,7 @@ func (pc *pageContext)backCommand( ) {
                     ub = data[0] & 0xf0
                     tag = 2 | (1 << 2) // undo next byte, redo next nibble
                 }
-                pc.store.replaceByteAt( bPos, tag, ub )
+                pc.store.ReplaceByteAt( bPos, tag, ub )
             } else {
                 pc.bck( pc )
             }
