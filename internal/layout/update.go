@@ -8,10 +8,13 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 )
 
+// GetRootWidget returns the layout root widget that was created by newLayout
 func (lo *Layout)GetRootWidget() *gtk.Widget {
     return lo.root.ToWidget()
 }
 
+// GetItemNames returns the list of all item names included in the Layout. That
+// list is not sorted alphabetically.
 func (lo *Layout)GetItemNames() (names []string) {
     names = make( []string, len(lo.access) )
     i := 0
@@ -22,43 +25,22 @@ func (lo *Layout)GetItemNames() (names []string) {
     return
 }
 
-func (lo *Layout)View( status bool ) {
+// SetVisible makes the Layout root widget visible or invisible depending on
+// the argument visible.
+func (lo *Layout)SetVisible( visible bool ) {
     if lo.root != nil {
-        lo.root.ToWidget().SetVisible( status )
+        lo.root.ToWidget().SetVisible( visible )
     }
 }
 
-func MakeLayout( def interface{} ) (layout *Layout, err error) {
-
-    layout = new(Layout)
-    layout.access = make( map[string]*itemReference )
-
-    var itemRef *itemReference
-    switch def := def.(type) {
-    case *GridDef:
-        itemRef, err = layout.addGridItem( def )
-    case *BoxDef:
-        itemRef, err = layout.addBoxItem( def )
-    case *ConstDef:
-        itemRef, err = layout.addConstItem( def )
-    case *InputDef:
-        itemRef, err = layout.addInputItem( def )
-    default:
-        return nil, fmt.Errorf( "makeLayout: unsupported type %T\n", def )
-    }
-    if err != nil {
-        return nil, fmt.Errorf( "makeLayout: unable to make root: %v", err )
-    }
-    layout.root = itemRef.item.(gtk.IWidget)
-    return
-}
-
-func (dg *DataGrid)SetRowVisible( rowIndex int, visible bool ) error {
-    if rowIndex < 0 || rowIndex >= len(dg.rowItems) {
+// SetRowVisible makes a row in the grid specified by the argument index
+// visible or invisible depending on the argument visible.
+func (dg *DataGrid)SetRowVisible( index int, visible bool ) error {
+    if index < 0 || index >= len(dg.rowItems) {
         return fmt.Errorf( "setRowVisible: row index %d out of range [0:%d[\n",
-                           rowIndex, len(dg.rowItems) )
+                           index, len(dg.rowItems) )
     }
-    rowItems := dg.rowItems[rowIndex]
+    rowItems := dg.rowItems[index]
     for _, colItemRef := range rowItems {
         wdg := colItemRef.item.(gtk.IWidget).ToWidget()
         wdg.SetVisible( visible )
@@ -66,12 +48,14 @@ func (dg *DataGrid)SetRowVisible( rowIndex int, visible bool ) error {
     return nil
 }
 
-func (dg *DataGrid)SetColVisible( colIndex int, visible bool ) error {
-    if colIndex < 0 || colIndex >= len(dg.colItems) {
+// SetColVisible makes a column in the grid specified by the argument index
+// visible or invisible depending on the argument visible.
+func (dg *DataGrid)SetColVisible( index int, visible bool ) error {
+    if index < 0 || index >= len(dg.colItems) {
         return fmt.Errorf( "setRowVisible: col index %d out of range [0:%d[\n",
-                           colIndex, len(dg.colItems) )
+                           index, len(dg.colItems) )
     }
-    colItems := dg.colItems[colIndex]
+    colItems := dg.colItems[index]
     for _, rowItemRef := range colItems {
         wdg := rowItemRef.item.(gtk.IWidget).ToWidget()
         wdg.SetVisible( visible )
@@ -95,6 +79,8 @@ func (lo *Layout)getButton( name string ) (*TextFmt, *gtk.Button, error) {
     return nil, nil, fmt.Errorf( "item %s is not a button\n", name )
 }
 
+// GetButtonLabel returns the label of the button identified by its definition
+// name, or an error if the given name does not match a button.
 func (lo *Layout)GetButtonLabel( name string ) (string, error) {
     _, button, err := lo.getButton( name )
     if err != nil {
@@ -103,6 +89,8 @@ func (lo *Layout)GetButtonLabel( name string ) (string, error) {
     return button.GetLabel()
 }
 
+// SetButtonLabel sets the label of the button identified by its definition
+// name, or returns an error if the given name does not match a button.
 func (lo *Layout)SetButtonLabel( name string, label string ) error {
     format, button, err := lo.getButton( name )
     if err != nil {
@@ -113,6 +101,8 @@ func (lo *Layout)SetButtonLabel( name string, label string ) error {
     return nil
 }
 
+// GetButtonActive returns the sensitivity status of the button identified by
+// its definition name, or an error if the given name does not match a button.
 func (lo *Layout) GetButtonActive( name string ) (bool, error) {
     _, button, err := lo.getButton( name )
     if err != nil {
@@ -121,6 +111,9 @@ func (lo *Layout) GetButtonActive( name string ) (bool, error) {
     return button.GetSensitive( ), nil
 }
 
+// SetButtonActive sets the sensitivity status of the button identified by its
+// definition name, or returns an error if the given name does not match a
+// button.
 func (lo *Layout) SetButtonActive( name string, state bool ) error {
     _, button, err := lo.getButton( name )
     if err != nil {
@@ -130,6 +123,9 @@ func (lo *Layout) SetButtonActive( name string, state bool ) error {
     return nil
 }
 
+// GetItemTooltip returns the tooltip text associated with the item identified
+// by its definition name, or an error if the given name does not match an item
+// that can have a tooltip.
 func (lo *Layout)GetItemTooltip( name string ) (string, error) {
     ref, ok := lo.access[name]
     if ! ok {
@@ -157,9 +153,12 @@ func (lo *Layout)GetItemTooltip( name string ) (string, error) {
     if wg != nil {
         return wg.GetTooltipMarkup()
     }
-    return "", fmt.Errorf( "GetItemTooltip: item %s is not a button\n", name )
+    return "", fmt.Errorf( "GetItemTooltip: item %s cannot have tooltip\n", name )
 }
 
+// SetItemTooltip sets the tooltip text associated with the item identified by
+// its definition name, or returns an error if the given name does not match an
+// item that can have a tooltip.
 func (lo *Layout)SetItemTooltip( name string, tooltip string ) error {
     ref, ok := lo.access[name]
     if ! ok {
@@ -188,17 +187,17 @@ func (lo *Layout)SetItemTooltip( name string, tooltip string ) error {
         wg.SetTooltipMarkup( tooltip )
         return nil
     }
-    return fmt.Errorf( "SetItemTooltip: item %s is not a button\n", name )
+    return fmt.Errorf( "SetItemTooltip: item %s cannot have tooltip\n", name )
 }
 
-// getItemValue returns the current value associated with the given item name
+// GetItemValue returns the current value associated with the given item name
 // Depending on item type, returned values can be:
-//   - bool for constant or input bool and for toogle button
+//   - bool for constant or input bool and for a toogle button
 //   - int64 for constant or input int
 //   - string for constant or input string
 // Error is returned if the given name does not match any known item or if the
-// value type does not match the expected item value. Since press button have no
-// value, getting its value returns an error.
+// value type does not match the expected item value. Since press button have
+// no value, getting its value returns an error.
 func (lo *Layout) GetItemValue( name string ) (interface{}, error) {
     ref, ok := lo.access[name]
     if ! ok {
@@ -255,8 +254,6 @@ func (lo *Layout) GetItemValue( name string ) (interface{}, error) {
 }
 
 func setComboBoxTextValue( item *gtk.ComboBoxText, text string ) error {
-//fmt.Printf("setItemValue: updating ComboBoxText with text %s\n", text )
-
     bin := item.ComboBox.Bin
     entry, err := bin.GetChild()
     if err != nil {
@@ -314,6 +311,14 @@ func convertTextToInt64( t string ) int64 {
     return v
 }
 
+// SetItemValue sets the value associated with the given item name
+// Depending on item type, the passed value can be:
+//   - bool for constant or input bool and for a toogle button
+//   - int64 for constant or input int
+//   - string for constant or input string
+// Error is returned if the given name does not match any known item or if the
+// value type does not match the expected item value. Since press button have
+// no value, setting its value returns an error.
 func (lo *Layout) SetItemValue( name string, value interface{} ) error {
     ref, ok := lo.access[name]
     if ! ok {
@@ -421,6 +426,9 @@ func (lo *Layout) getItemEntry( name string ) (*gtk.Entry, error) {
     return nil, fmt.Errorf("item %d has no entry", name)
 }
 
+// SetEntryFocus sets focus on the text entry associated with the given item
+// name. It returns an error if the item does not exist or if it has no text
+// entry.
 func (lo *Layout) SetEntryFocus( name string, noSelection bool ) error {
     entry, err := lo.getItemEntry( name )
     if err != nil {
@@ -434,6 +442,9 @@ func (lo *Layout) SetEntryFocus( name string, noSelection bool ) error {
     return nil
 }
 
+// SetEntrySelection selects text within the text entry associated with the
+// given item name. It returns an error if the item does not exist or if it
+// has no text entry.
 func (lo *Layout) SetEntrySelection( name string, start, beyond int ) error {
     entry, err := lo.getItemEntry( name )
     if err != nil {
@@ -443,6 +454,9 @@ func (lo *Layout) SetEntrySelection( name string, start, beyond int ) error {
     return nil
 }
 
+// SetEntryCursor sets the cursor within the text entry associated with the
+// given item name. It returns an error if the item does not exist or if it
+// has no text entry.
 func (lo *Layout) SetEntryCursor( name string, position int ) error {
     entry, err := lo.getItemEntry( name )
     if err != nil {
@@ -452,6 +466,9 @@ func (lo *Layout) SetEntryCursor( name string, position int ) error {
     return nil
 }
 
+// SetItemChoices redefines the list of choices associated with the given item
+// name. It returns an error if the item does not exist or if it does not
+// support multiple choices.
 func (lo *Layout) SetItemChoices( name string,
                                   choices interface{},
                                   active int,
@@ -533,12 +550,15 @@ func (lo *Layout) SetItemChoices( name string,
     }
 }
 
-// History is just a slice of strings that may be used as choices in a drop
-// down mmenu (comboBoxText).
+// History is an opaque type that may be used as choices in a drop-down menu
+// item. It has a maximum depth and is managed in a last recently used manner.
+// It is commonly used to remember frequent previous choices.
 type History struct {
     store           []string                // previous history entries
 }
 
+// NewHistory creates and returns a new history with a given depth. It only
+// returns an error if the depth is negative or zero.
 func NewHistory( maxDepth int ) (h *History, err error) {
     if maxDepth < 1 {
         err = fmt.Errorf("NewHistory: max depth %d is too small\n", maxDepth)
@@ -549,10 +569,12 @@ func NewHistory( maxDepth int ) (h *History, err error) {
     return 
 }
 
+// Get returns the current history as a slice of strings.
 func (h *History) Get( ) []string {
     return h.store[:]
 }
 
+// Depth returns the current history size.
 func (h *History) Depth( ) int {
     return len(h.store)
 }
@@ -561,10 +583,10 @@ func (h *History) Depth( ) int {
 // returns the modified history slices, so that they can be set as choices.
 // Update looks up existing entries for the new text to enter in history.
 // if an existing history entry is found that matches the new text, that entry
-// is just moved back to the first (most recent) entry and the history depth is
+// is just moved up to the first (most recent) entry and the history depth is
 // left unchanged. The reordered history is returned. If that entry was already
-// the first entry, the whole hsitory is not modified and an empty history is
-// returned to indicate that choices do not need to be modified.
+// the first entry, the whole history is not modified and an empty history is
+// returned to indicate that choices do not need to be updated.
 func (h *History) Update( text string ) []string {
     l := len(h.store)
     if l > 0 {                          // history is not empty

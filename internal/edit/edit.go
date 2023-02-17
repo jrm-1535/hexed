@@ -1,3 +1,5 @@
+// Package edit provides primitives for editing (inserting, deleting, replacing,
+// copying. cutting, pasting, undoing, redoing) any sequence of bytes.
 package edit
 
 import (
@@ -28,14 +30,14 @@ type multiPosOp struct {
     positions           []int64         // where in data operations take place
 }
 
-// clipboard interface, used in cutBytesAt, copyBytesAt, insertClipboardAt
-// and replaceWithClipboardAt
+// clipboard interface required for cutting to and pasting from.
 type Clipboard interface{
-    Set( data []byte )
-    Get( ) byte
-    Size( ) int64
+    Size( ) int64       // return clipboard current content size
+    Set( data []byte )  // overwrite clipboard content with data slice
+    Get( ) byte         // read one byte at a time from clipboard [0:size]
 }
 
+// Storage object required for any operation.
 type Storage struct {
     curData             []byte          // always current data
     newData             []byte          // inserted/replacing data (for redo)
@@ -52,18 +54,17 @@ type Storage struct {
     lost                bool            // true if full undo history is unknown
 }
 
-// some debug functions
-
-func (s *Storage) Print(  ) {
+// internal debug functions
+func (s *Storage) print(  ) {
     fmt.Printf("Storage %v\n", s.curData )
 }
 
-func (s *Storage) PrintInternal( ) {
+func (s *Storage) printInternal( ) {
     fmt.Printf( "newData storage %v\n", s.newData )
     fmt.Printf( "cutData storage %v\n", s.cutData )
 }
 
-func (s *Storage) PrintStack( ) {
+func (s *Storage) printStack( ) {
     fmt.Printf( "Stack length %d, top=%d\n", len(s.stack), s.top )
     for i, op := range s.stack {
         if i == s.top {
@@ -83,12 +84,12 @@ func (s *Storage) PrintStack( ) {
     }
 }
 
-// return current storage length
+// return current storage length.
 func (s *Storage) Length() int64 {
     return int64(len(s.curData))
 }
 
-// return whether storage is presumed modified since creation/load
+// return whether storage is presumed modified since creation/reload.
 func (s *Storage)IsDirty( ) bool {
     if s.lost {
         return true
@@ -96,20 +97,23 @@ func (s *Storage)IsDirty( ) bool {
     return s.top > 0
 }
 
+// attach a notification triggered each time the storage length changes.
 func (s *Storage) SetNotifyLenChange( f func( int64 ) ) {
     s.notifyLenChange = f
 }
 
+// attach a notification triggered each time the undo/redo capability changes.
 func (s *Storage) SetNotifyUndoRedoAble( f func( u, r bool ) ) {
     s.notifyUndoRedo = f
 }
 
+// attach a notification triggered each time data changes in storage.
 func (s *Storage) SetNotifyDataChange( f func() ) {
     s.notifyDataChange = f
 }
 
-// return current storage content
-// Beware, it is only a shallow copy: DO NOT MODIFY the returned data
+// GetData returns the current storage content.
+// Beware, it is only a shallow copy: do NOT MODIFY the returned data
 func (s *Storage) GetData( start, beyond int64 ) []byte {
     if start < 0 || start > beyond || beyond > int64(len(s.curData)) {
         return nil
@@ -117,8 +121,13 @@ func (s *Storage) GetData( start, beyond int64 ) []byte {
     return s.curData[start:beyond]
 }
 
-// default or specific storage initialization
-func InitStorage( path string, clip Clipboard ) ( *Storage, error ) {
+// NewStorage creates and initializes a storage. The argument path is a
+// path to a file containing data bytes to edit. The argument clip is the
+// clipboard interface to use when cutting, copying or pasting. In case path
+// is empty, an initially empty storage is returned. An error is returned if
+// the file corresponding to the path cannot be read, otherwise the whole
+// file is read in memory, and the new storage is returned.
+func NewStorage( path string, clip Clipboard ) ( *Storage, error ) {
 
     var initialData []byte
     var err error
@@ -139,6 +148,9 @@ func InitStorage( path string, clip Clipboard ) ( *Storage, error ) {
     return &result, nil
 }
 
+// Reload performs storage re-initialization. It is used for example when
+// reverting to the original data file. The original path must be provided.
+// An error is returned if the file corresponding to the path cannot be read.
 func (s *Storage)Reload( path string ) error {
     // check if file can still be opened
     _, err := os.Open( path )
@@ -186,6 +198,10 @@ func (s *Storage)Reload( path string ) error {
 // reversed similarly. In all cases, undo does not push the command and does
 // not save the restored data again, since the command slice, backup and cut
 // storages are still valid: the top of the stack is just decremented.
+
+// Undo undo the last operation done on the storage. The position and tag
+// provided when the operation was requested are returned to the caller.
+// An error is returned if no operation can be undone.
 func (s *Storage) Undo( ) (pos, tag int64, err error) {
     if s.top <= 0 {
         err = fmt.Errorf( "undo stack empty\n" )
@@ -210,9 +226,6 @@ func (s *Storage) Undo( ) (pos, tag int64, err error) {
         tag = op.tag
         pos = op.positions[0]
         c := op.cut
-//fmt.Printf( "undo multiPosOp: tag=%d insLen=%d delLen=%d nPos=%d pos=%v\n",
-//            tag, op.insLen, op.delLen, len(op.positions), op.positions )
-//fmt.Printf("       backup=%d %v cut=%d %v\n", op.backup, s.newData, op.cut, s.cutData )
         s.replaceInCurDataAtMultipleLocations( op.positions, tag, op.insLen,
                                                s.cutData[c:c+op.delLen], false )
     }
@@ -225,6 +238,10 @@ func (s *Storage) Undo( ) (pos, tag int64, err error) {
 // the command as if it was requested again. Redo does not push the command
 // and does not save the restored data again, since the command slice, backup
 // and cut storages are still valid: the top of the stack is just incremented.
+
+// Redo does again the last undone operation. The position and tag provided
+// when the operation was initially requested are returned to the caller.
+// An error is returned if no operation can be redone.
 func (s *Storage) Redo( ) (pos, tag int64, err error) {
 
     if s.top >= len( s.stack ) {
@@ -255,6 +272,8 @@ func (s *Storage) Redo( ) (pos, tag int64, err error) {
     return
 }
 
+// Checks whether Undo and/or Redo are possible and return a tuple (undo, redo)
+// indicating the state of each.
 func (s *Storage) AreUndoRedoPossible( ) (u, r bool) {
     if s.top < len( s.stack ) {
         r = true
@@ -389,6 +408,10 @@ func (s *Storage) insertInCurData( pos, tag int64, data []byte, save bool ) erro
     return nil
 }
 
+// InsertClipboardAt implements a paste operation, inserting clipboard content
+// at the given position in storage data. The arguments pos and tag are saved
+// and returned when undoing or redoing the operation. An error is returned if
+// the position is out of storage.
 func (s *Storage) InsertClipboardAt( pos, tag int64 ) error {
     cl := int64(len(s.curData))
     if cl < pos || pos < 0 {
@@ -452,14 +475,20 @@ func (s *Storage) InsertClipboardAt( pos, tag int64 ) error {
     return nil
 }
 
-// insert a single byte at position pos
-func (s *Storage) InsertByteAt( pos, tag int64, v byte ) error {
-    return s.insertInCurData( pos, tag, []byte{ v }, true )
+// InsertByteAt inserts a single byte in the storage at position given by the
+// argument pos. The arguments pos and tag are saved and returned when undoing
+// or redoing the operation. The argument b is the byte to insert. An error is
+// returned if the position is out of storage.
+func (s *Storage) InsertByteAt( pos, tag int64, b byte ) error {
+    return s.insertInCurData( pos, tag, []byte{ b }, true )
 }
 
-// insert multiple bytes at position pos
-func (s *Storage) InsertBytesAt( pos, tag int64, v []byte ) error {
-    return s.insertInCurData( pos, tag, v, true )
+// InsertBytesAt inserts multiple bytes in the storage at position given by the
+// argument pos. The arguments pos and tag are saved and returned when undoing
+// or redoing the operation. The argument b is the byte slice to insert. An
+// error is returned if the position is out of storage.
+func (s *Storage) InsertBytesAt( pos, tag int64, b []byte ) error {
+    return s.insertInCurData( pos, tag, b, true )
 }
 
 // delete or cut data starting at pos, for the given length.
@@ -490,12 +519,19 @@ func (s *Storage) cutInCurData( pos, tag, length int64, save bool ) error {
     return nil
 }
 
-// delete one byte at position pos.
+// DeleteByteAt deletes one byte in the storage at position given by the
+// argument pos. The arguments pos and tag are saved and returned when undoing
+// or redoing the operation. An error is returned if the position is out of
+// storage.
 func (s *Storage) DeleteByteAt( pos, tag int64 ) error {
     return s.cutInCurData( pos, tag, 1, true )
 }
 
-// delete n bytes at position pos.
+// DeleteBytesAt deletes multiple bytes in the storage at position given by the
+// argument pos. The segment to delete is defined by the starting pposition and
+// the number of bytes n. The arguments pos and tag are saved and returned when
+// undoing or redoing the operation. An error is returned if the segment to
+// delete does not fit in storage.
 func (s *Storage) DeleteBytesAt( pos, tag, n int64 ) error {
     return s.cutInCurData( pos, tag, n, true )
 }
@@ -512,7 +548,11 @@ func (s *Storage) saveClipboardData( pos, n int64 ) error {
     return nil
 }
 
-// cut n bytes starting at position pos
+// CutBytesAt implements a cut operation, from the storage to the clipboard.
+// It moves the number of bytes given by the argument n, starting at position
+// given by the argument pos from the storage, to the clipboard. The arguments
+// pos and tag are saved and returned when undoing or redoing the operation.
+// An error is returned if the segment to delete does not fit in storage.
 func (s *Storage) CutBytesAt( pos, tag, n int64 ) error {
     if err := s.saveClipboardData( pos, n ); err != nil {
         return err
@@ -520,7 +560,12 @@ func (s *Storage) CutBytesAt( pos, tag, n int64 ) error {
     return s.cutInCurData( pos, tag, n, true )
 }
 
-// copy n bytes starting at position pos
+// CopyBytesAt implements a copy operation, from storage to the clipboard. It
+// copies the number of bytes given by the argument n, starting at position
+// given by the argument pos from the storage, to the clipboard. Since this
+// operation has no effect on the storage (nothing is added, removed or
+// replaced), it is not possible to undo or redo it, and no tag is needed.
+// An error is returned if the segment to copy does not fit in storage.
 func (s *Storage) CopyBytesAt( pos, n int64 ) error {
     return s.saveClipboardData( pos, n )
 }
@@ -602,6 +647,13 @@ func (s *Storage) replaceInCurDataNotifySave( pos, tag, dl int64,
     return nil
 }
 
+// ReplaceWithClipboardAt replaces a segment of data bytes in storage with
+// the content of the clipboard. It has the same effect as deleting the segment
+// and inserting the content of the clipboard at the same location. The
+// arguments pos and dl indicate the starting point and the length of the data
+// segment in storage respectively. The arguments pos and tag are saved and
+// returned when undoing or redoing the operation. An error is returned if the
+// segment to replace does not fit in storage.
 func (s *Storage) ReplaceWithClipboardAt( pos, tag, dl int64 ) error {
     curLen := int64(len(s.curData))
     if pos < 0 || dl < 0 || (pos + dl) > curLen {
@@ -619,14 +671,27 @@ func (s *Storage) ReplaceWithClipboardAt( pos, tag, dl int64 ) error {
     return nil
 }
 
-// replace one byte at position pos
-func (s *Storage) ReplaceByteAt( pos, tag int64, v byte ) error {
-    return s.replaceInCurDataNotifySave( pos, tag, 1, []byte{v} )
+// ReplaceByteAt replaces one byte in the storage at position given by the
+// argument pos. It has the same effect as deleting one byte and inserting
+// another one at the same location. The argument pos gives the location of
+// the byte to replace. The arguments pos and tag are saved and returned when
+// undoing or redoing the operation. The argument b is the byte that should
+// replace the one deleted. An error is returned if the position is outside
+// storage.
+func (s *Storage) ReplaceByteAt( pos, tag int64, b byte ) error {
+    return s.replaceInCurDataNotifySave( pos, tag, 1, []byte{b} )
 }
 
-// replace multiple bytes at position pos
-func (s *Storage) ReplaceBytesAt( pos, tag, l int64, v []byte ) error {
-    return s.replaceInCurDataNotifySave( pos, tag, l, v )
+// ReplaceBytesAt replaces multiple bytes in the storage at position given by
+// the argument pos. It has the same effect as deleting a segment of bytes in
+// storage and inserting a new segment of bytes at the same location. The
+// arguments pos and dl indicate the starting point and the length of the data
+// segment in storage respectively. The arguments pos and tag are saved and
+// returned when undoing or redoing the operation. The argument b is the slice
+// of bytes that should be inserted after the segment is deleted. An error is
+// returned if the segment to replace does not fit in storage.
+func (s *Storage) ReplaceBytesAt( pos, tag, dl int64, b []byte ) error {
+    return s.replaceInCurDataNotifySave( pos, tag, dl, b )
 }
 
 func (s *Storage) replaceInCurDataAtMultipleLocations( pos []int64,
@@ -649,33 +714,44 @@ func (s *Storage) replaceInCurDataAtMultipleLocations( pos []int64,
     }
 }
 
-// replace multiple bytes at multiple locations given by the pos slice.
-func (s *Storage) ReplaceBytesAtMultipleLocations( pos []int64, tag, l int64,
-                                                   v []byte ) error {
+// ReplaceBytesAtMultipleLocations replaces multiple bytes at multiple locations
+// given by a slice of positions. It has the same effect as repeating deleting
+// a segment of bytes in storage then inserting a new segment of bytes at the
+// same location, for each position in the slice. The argument pos is the slice
+// of position where replacement should happen. The argument dl indicates the
+// length of bytes to delete ar eacj position, and the argument b is the new
+// slice of data byte that should replace the deleted ones. When undoing or
+// redoing the operation the first position (that is pos[0]) and tag are
+// returned. An error is returned if any segment to replace does not fit in
+// storage and no replacement occurs.
+func (s *Storage) ReplaceBytesAtMultipleLocations( pos []int64, tag, dl int64,
+                                                   b []byte ) error {
     curLen := int64(len(s.curData))
     for _, p := range pos {
-        if p < 0 || l < 0 || p + l > curLen {
+        if p < 0 || dl < 0 || p + dl > curLen {
             return fmt.Errorf("REPLACE outside data boundaries\n")
         }
     }
-    nl := int64(len(v))
-    s.pushMultiPosOp( pos, tag, l, nl )
+    nl := int64(len(b))
+    s.pushMultiPosOp( pos, tag, dl, nl )
     p := pos[0]
-    s.cutData = append( s.cutData, s.curData[p:p+l]... )
-    s.newData = append( s.newData, v... )
-    s.replaceInCurDataAtMultipleLocations( pos, tag, l, v, true )
+    s.cutData = append( s.cutData, s.curData[p:p+dl]... )
+    s.newData = append( s.newData, b... )
+    s.replaceInCurDataAtMultipleLocations( pos, tag, dl, b, true )
     return nil
 }
 
 // special operations to avoid creating extra slices when deleting bytes
 
-// replaceByteAtAndEraseFollowingBytes replaces the first byte at pos with the
-// given byte v, and erases the following n bytes . This is used in case of
+// ReplaceByteAtAndEraseFollowingBytes replaces the first byte in storage at
+// the location given by the argument pos with the given byte b, and erases the
+// number of following bytes given by the argument n. This is used in case of
 // replace editing mode when a selection is replaced by a single byte. This is
 // treated as a replaceBytesAt in order to allow undo/redo as usual, but the
 // caller does not have to create an extra, potentially large, slice full of
-// zeros.
-func (s *Storage) ReplaceByteAtAndEraseFollowingBytes( pos, tag int64, v byte,
+// zeros. An error is returned if the segment to replace does not fit in
+// storage.
+func (s *Storage) ReplaceByteAtAndEraseFollowingBytes( pos, tag int64, b byte,
                                                        n int64 ) error {
     curLen := int64(len(s.curData))
     if pos < 0 || n < 0 || (pos + n + 1) > curLen {
@@ -683,11 +759,10 @@ func (s *Storage) ReplaceByteAtAndEraseFollowingBytes( pos, tag int64, v byte,
     }
     il := int64(n+1)
 
-//    s.push( REPLACE, pos, tag, il, il ) // il removed, il inserted
     s.pushSinglePosOp( pos, tag, il, il )          // il removed, il inserted
     s.cutData = append( s.cutData, s.curData[pos:pos+il]... )
     nPos := int64(len(s.newData))
-    s.newData = append( s.newData, v )
+    s.newData = append( s.newData, b )
 
     for i := int64(0); i < n; i++ {
         s.newData = append( s.newData, 0 )

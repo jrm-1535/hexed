@@ -1,0 +1,434 @@
+package layout // import "github.com/jrm-1535/grid/internal/layout"
+
+Package layout provides primitives for creating complex dialogs using gotk3
+
+The package provides 3 different kind of objects:
+
+    - Layout that provides the dialog widgets (button, text entry, etc)
+    - Dialog that provides the top level dialog window and contains a layout.
+    - History that provides a way to keep previous inputs in a last recently
+      used order.
+
+A Layout is given as a tree of high level widget descriptions. Those widgets
+can be:
+
+    - a presentation of constant value, boolean, integer or text.
+    - a presentation of an input field, boolean, integer, text or button.
+    - a container of widgets, box or grid.
+
+Each widget has a name and a horizontal padding on the left side. Widgets
+containing texts have a format definition allowing basic formatting. Input
+widgets have a changed callback called whenever the input has been modified.
+
+Once created all widgets are accessible by the name given in their
+description and can be modified programaticaly.
+
+CONSTANTS
+
+const (
+	SHIFT   = KeyModifier(gdk.SHIFT_MASK)   // 1
+	LOCK    = KeyModifier(gdk.LOCK_MASK)    // 2
+	CONTROL = KeyModifier(gdk.CONTROL_MASK) // 4
+	ALT     = KeyModifier(gdk.MOD1_MASK)    // 8
+)
+    Key modifier
+
+const (
+	LEFT_POS   = TabPosition(gtk.POS_LEFT)
+	RIGHT_POS  = TabPosition(gtk.POS_RIGHT)
+	TOP_POS    = TabPosition(gtk.POS_TOP)
+	BOTTOM_POS = TabPosition(gtk.POS_BOTTOM)
+)
+    Tab position in a multi-page dialog
+
+
+FUNCTIONS
+
+func HexaFilter(key uint, mod KeyModifier) bool
+    HexFilter fiters out keys that are not hexadecimal [0-9]|[A-F]|[a-f]
+
+func VisitDialogs(visit func(dg *Dialog) bool)
+    VisitDialogs calls the function visit passed as argument for each currently
+    alive dialog.
+
+
+TYPES
+
+type AlignAttr uint
+
+const (
+	LEFT AlignAttr = iota
+	CENTER
+	RIGHT
+)
+    Text alignment
+
+type BoxDef struct {
+	Name      string        // used to manipulate item after creation
+	Padding   uint          // left padding in parent box or cell
+	Margin    int           // first/last item and box (within direction)
+	Spacing   uint          // spacing between items
+	Title     string        // optional frame title
+	Border    bool          // visible frame around box
+	Direction Orientation   // box orientation (HORIZONTAL/VERTICAL)
+	ItemDefs  []interface{} // *boxDef, *gridDef, *constDef or *inputDef
+}
+    Box:
+
+        Linear area of cells, such that all cells are in a single column or in
+        a single row. Each cell share the same size on the other dimension, i.e.
+        same width for a column or same height for a row, but each can have a
+        different size in the box dimension, i.e. height in a column or width
+        in a row.
+
+type ButtonCtl struct {
+	Toggle  bool // whether button press toggles its state
+	Initial bool // if toggle, initial toggle state
+}
+    Button behavior control (press or toggle)
+
+type ColDef struct {
+	Expand bool // whether to expand if extra room available
+}
+    Column definition (whether it should expand to fill up extra space)
+
+type ConstDef struct {
+	Name    string      // internal name to get or set the text
+	Padding uint        // left padding in parent box or cell
+	Value   interface{} // bool, int, string
+	ToolTip string      // possible constant description
+	Format  *TextFmt    // presentation format (int & string)
+}
+    Constant item definition (text, integer or boolean)
+
+type DataGrid struct {
+	// Has unexported fields.
+}
+    DataGrid is an opaque data type used to refer of a specific grid in a
+    Layout. It is returned by GetItemValue when the item name matches a grid
+    definition. It is used with SetRowVisible and SetColVisible to control the
+    visibility of grid rows and columns.
+
+func (dg *DataGrid) SetColVisible(index int, visible bool) error
+    SetColVisible makes a column in the grid specified by the argument index
+    visible or invisible depending on the argument visible.
+
+func (dg *DataGrid) SetRowVisible(index int, visible bool) error
+    SetRowVisible makes a row in the grid specified by the argument index
+    visible or invisible depending on the argument visible.
+
+type Dialog struct {
+	// Has unexported fields.
+}
+    Dialog is an opaque type used to access the layout of dialog pages. Dialogs
+    here are always non-modal. They are born when NewDialog returns and they are
+    dead either when Close returns, or when the user closes the dialog window
+    using the window manager.
+
+func NewDialog(title string, parent *gtk.Window, userData interface{},
+	pos DialogPosition, tabPos TabPosition, pages []DialogPage,
+	quit func(*Dialog), iWith, iHeight int) (*Dialog, error)
+    NewDialog creates a new Dialog window with the content provided.
+
+    The created dialog is not modal. The argument parent is the parent window,
+    which always stays underneath but the dialog is automatically closed if the
+    parent window is closed. The argument pos gives the new window position. The
+    dialog shows the layout whose definition is provided with the argument
+    pages. In case more than one page is needed, each page is accessible through
+    a tab. Those tabs are grouped together and aligned according to the argument
+    tabPos (left, right, top or bottom). If only one page is needed, the
+    argument tabPos is ignored. The arguments iWidth and iHeight give the
+    initial window size (which is increased if the content requires a larger
+    size) and the argument title is used for the dialog title.
+
+    The argument userData is saved within the dialog object and can be retreived
+    from the dialog object by calling the method GetUserData. It is not used
+    otherwise.
+
+    The argument quit is a function that is called when the dialog is closed by
+    the user, in order to allow doing some extra clean up.
+
+    If successful NewDialog returns a new Dialog, otherwise it returns an error.
+
+func (dg *Dialog) Close()
+    Close closes and forgets the dialog.
+
+func (dg *Dialog) GetPage(pageNumber int) (*Layout, error)
+    GetPageLayout returns the layout of a given dialog page, or an error if the
+    page number is out of range.
+
+func (dg *Dialog) GetUserData() interface{}
+    GetUserData returns the user data given ti NewDialog. It is an empty
+    interface that can refer to anything.
+
+func (dg *Dialog) SetPageName(pageNumber int, name string) error
+    SetPageName set the tag name of a specific page inside the dialog. It does
+    nothing if the dialog has a single page. It returns an error if the page
+    number is out of range.
+
+func (dg *Dialog) SetTitle(title string)
+    SetTitle sets the dialog window title.
+
+func (dg *Dialog) VisitContent(visit func(pageNumber int, page *Layout) bool)
+    VisitContent calls the function visit passed as argument for each page
+    layout in the dialog.
+
+type DialogPage struct {
+	Name string
+	Def  interface{}
+}
+    Dialog page definition in a multi-page dialog
+
+type DialogPosition int
+
+const (
+	AT_UNDEFINED_POS DialogPosition = iota
+	AT_SCREEN_CENTER
+	AT_MOUSE_POS
+	AT_PARENT_CENTER
+)
+    Dialog position
+
+type FontAttr uint
+
+const (
+	REGULAR   FontAttr = 0
+	MONOSPACE FontAttr = 1 << iota
+	BOLD
+	ITALIC
+)
+    Font attribute
+
+type GridDef struct {
+	Name    string        // used to manipulate item after creation
+	Padding uint          // left padding in parent box or cell
+	H       HorizontalDef // defines the columns
+	V       VerticalDef   // defines the rows
+}
+    Grid:
+
+        Rectangular area of cells, such that all cells in the same column have
+        the same width, which is either the width of the widest item in the
+        column or the remaining width in the row if the column has the expand
+        property set, and all cells in the same row have the same height, which
+        is the height of the tallest item in the row or the remaining height i
+
+        Although the number of cells is fixed in a given grid, cells can be
+        empty, leaving holes in the grid.
+
+type History struct {
+	// Has unexported fields.
+}
+    History is an opaque type that may be used as choices in a drop-down menu
+    item. It has a maximum depth and is managed in a last recently used manner.
+    It is commonly used to remember frequent previous choices.
+
+func NewHistory(maxDepth int) (h *History, err error)
+    NewHistory creates and returns a new history with a given depth. It only
+    returns an error if the depth is negative or zero.
+
+func (h *History) Depth() int
+    Depth returns the current history size.
+
+func (h *History) Get() []string
+    Get returns the current history as a slice of strings.
+
+func (h *History) Update(text string) []string
+    Update enters a new text entry in history if it does not exist yet. It
+    returns the modified history slices, so that they can be set as choices.
+    Update looks up existing entries for the new text to enter in history. if an
+    existing history entry is found that matches the new text, that entry is
+    just moved up to the first (most recent) entry and the history depth is left
+    unchanged. The reordered history is returned. If that entry was already the
+    first entry, the whole history is not modified and an empty history is
+    returned to indicate that choices do not need to be updated.
+
+type HorizontalDef struct {
+	Spacing uint     // space between columns
+	Columns []ColDef // list of column definitions
+}
+    Grid horizontal definition (columns and spacing between them)
+
+type IconDef struct {
+	Name string // stock icon name
+}
+    Icon for buttons
+
+type InputDef struct {
+	Name    string      // use to manipulate item after creation
+	Padding uint        // left padding in parent box or cell
+	Value   interface{} // initial value (bool, int, string, or
+	// initial button label (textDef or iconDef)
+	ToolTip string                                  // input help for users
+	Changed func(name string, val interface{}) bool // change notification
+	// val is same type as value or in case of
+	// button, a bool (state for toggle button).
+	Control interface{} // input control or button control:
+
+}
+    Input item definition (text, integer, boolean or button)
+
+type IntCtl struct {
+	InputMin int // minimum acceptable value
+	InputMax int // maximum acceptable value
+	InputInc int // increment between acceptable values
+}
+    Integer input from a range of acceptable values
+
+type IntList struct {
+	List      []int // initial list of integer
+	FreeEntry bool  // whether non-list entry is also accepted
+}
+    Integer input from a list of acceptable values
+
+type KeyModifier uint // Key-modifier bitmask
+
+type Layout struct {
+	// Has unexported fields.
+}
+    Layout is an opaque data type used to refer to the whole widget layout.
+
+func NewLayout(def interface{}) (layout *Layout, err error)
+    NewLayout takes a complete definition of the layout, typically a BoxDef or a
+    GridDef, and recursively builds the layout based on the content of that
+    definition. It returns an error if any definition encountered during
+    building is invalid ot unsupported otherwise it returns the new Layout.
+
+func (lo *Layout) GetButtonActive(name string) (bool, error)
+    GetButtonActive returns the sensitivity status of the button identified by
+    its definition name, or an error if the given name does not match a button.
+
+func (lo *Layout) GetButtonLabel(name string) (string, error)
+    GetButtonLabel returns the label of the button identified by its definition
+    name, or an error if the given name does not match a button.
+
+func (lo *Layout) GetItemNames() (names []string)
+    GetItemNames returns the list of all item names included in the Layout. That
+    list is not sorted alphabetically.
+
+func (lo *Layout) GetItemTooltip(name string) (string, error)
+    GetItemTooltip returns the tooltip text associated with the item identified
+    by its definition name, or an error if the given name does not match an item
+    that can have a tooltip.
+
+func (lo *Layout) GetItemValue(name string) (interface{}, error)
+    GetItemValue returns the current value associated with the given item name
+    Depending on item type, returned values can be:
+
+        - bool for constant or input bool and for a toogle button
+        - int64 for constant or input int
+        - string for constant or input string
+
+    Error is returned if the given name does not match any known item or if the
+    value type does not match the expected item value. Since press button have
+    no value, getting its value returns an error.
+
+func (lo *Layout) GetRootWidget() *gtk.Widget
+    GetRootWidget returns the layout root widget that was created by newLayout
+
+func (lo *Layout) SetButtonActive(name string, state bool) error
+    SetButtonActive sets the sensitivity status of the button identified by its
+    definition name, or returns an error if the given name does not match a
+    button.
+
+func (lo *Layout) SetButtonLabel(name string, label string) error
+    SetButtonLabel sets the label of the button identified by its definition
+    name, or returns an error if the given name does not match a button.
+
+func (lo *Layout) SetEntryCursor(name string, position int) error
+    SetEntryCursor sets the cursor within the text entry associated with the
+    given item name. It returns an error if the item does not exist or if it has
+    no text entry.
+
+func (lo *Layout) SetEntryFocus(name string, noSelection bool) error
+    SetEntryFocus sets focus on the text entry associated with the given item
+    name. It returns an error if the item does not exist or if it has no text
+    entry.
+
+func (lo *Layout) SetEntrySelection(name string, start, beyond int) error
+    SetEntrySelection selects text within the text entry associated with the
+    given item name. It returns an error if the item does not exist or if it has
+    no text entry.
+
+func (lo *Layout) SetItemChoices(name string,
+	choices interface{},
+	active int,
+	changed func(name string,
+		val interface{}) bool) error
+    SetItemChoices redefines the list of choices associated with the given item
+    name. It returns an error if the item does not exist or if it does not
+    support multiple choices.
+
+func (lo *Layout) SetItemTooltip(name string, tooltip string) error
+    SetItemTooltip sets the tooltip text associated with the item identified by
+    its definition name, or returns an error if the given name does not match an
+    item that can have a tooltip.
+
+func (lo *Layout) SetItemValue(name string, value interface{}) error
+    SetItemValue sets the value associated with the given item name Depending on
+    item type, the passed value can be:
+
+        - bool for constant or input bool and for a toogle button
+        - int64 for constant or input int
+        - string for constant or input string
+
+    Error is returned if the given name does not match any known item or if the
+    value type does not match the expected item value. Since press button have
+    no value, setting its value returns an error.
+
+func (lo *Layout) SetVisible(visible bool)
+    SetVisible makes the Layout root widget visible or invisible depending on
+    the argument visible.
+
+type Orientation gtk.Orientation
+
+const (
+	HORIZONTAL Orientation = Orientation(gtk.ORIENTATION_HORIZONTAL)
+	VERTICAL               = Orientation(gtk.ORIENTATION_VERTICAL)
+)
+    Box orientation
+
+type RowDef struct {
+	Expand bool          // whether to expand if extra room available
+	Items  []interface{} // row items
+}
+    Row definition (whether it should expand to fill up extra space, and list of
+    items: *boxDef, *gridDef, *constDef or *inputDef)
+
+type StrCtl struct {
+	InputMax int
+}
+    String input, free up to a maximum number of characters
+
+type StrList struct {
+	List      []string // initial list of strings
+	FreeEntry bool     // whether non-list entry is also accepted
+	InputMax  int      // maximum free entry length
+	MouseBut  func(name string, but gdk.Button) bool
+	KeyPress  func(name string, key uint, mod KeyModifier) bool
+}
+    String input from a list of acceptable values
+
+type TabPosition gtk.PositionType
+
+type TextDef struct {
+	Text   string // button label
+	Format *TextFmt
+}
+    Label for buttons
+
+type TextFmt struct {
+	Attributes FontAttr                                 // monospace, bold, italic, etc.
+	Align      AlignAttr                                // how to align text in frame
+	FrameSize  int                                      // max number of chars within frame (0 no limit)
+	Border     bool                                     // whether the frame has a border
+	Copy       func(name string, event *gdk.Event) bool // nil if not allowed
+}
+    Text formatting
+
+type VerticalDef struct {
+	Spacing uint     // space between rows
+	Rows    []RowDef // list of row definitions
+}
+    Grid vertical definition (rows and spacing between them)
+

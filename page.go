@@ -1081,7 +1081,7 @@ func (pc *pageContext)setStorage( path string ) (err error) {
         printDebug("updateStoreLength: nLines.previous=%d, .new=%d\n", pc.nLines, nLines )
         pc.updateScrollFromDataGridChange( pc.nBytesLine, nLines )
     }
-    pc.store, err = edit.InitStorage( path, getClipboard() )
+    pc.store, err = edit.NewStorage( path, getClipboard() )
     if err == nil {
         pc.store.SetNotifyDataChange( updateSearch )
         pc.store.SetNotifyLenChange( updateStoreLength )

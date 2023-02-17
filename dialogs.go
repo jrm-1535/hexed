@@ -165,7 +165,7 @@ func gotoDialog( ) {
         log.Fatal("gotoDialog: could not get content area:", err)
     }
     origin := getCurrentPos()
-    lo, err := layout.MakeLayout( getGotoDialogDef( origin ) )
+    lo, err := layout.NewLayout( getGotoDialogDef( origin ) )
     if err != nil {
         log.Fatal("gotoDialog: could not make layout:", err)
     }
@@ -541,7 +541,7 @@ func showPreferencesDialog( ) {
     editor := layout.DialogPage{ localizeText( dialogPreferencesEditorTab ),
                                   makePreferenceDialogEditorDef( ) }
     var err error
-    preferencesDialog, err = layout.MakeDialog(
+    preferencesDialog, err = layout.NewDialog(
                                   localizeText(windowTitlePreferences),
                                   window, nil,
                                   layout.AT_PARENT_CENTER, layout.LEFT_POS,
@@ -1285,7 +1285,7 @@ func showExploreDialog( data []byte, nibblePos int64 ) {
     }
 
     expDef := layout.DialogPage{ "", makeExploreDialogDef( exp, firstBit ) }
-    dg, err := layout.MakeDialog( "", window, exp,
+    dg, err := layout.NewDialog( "", window, exp,
                                  layout.AT_PARENT_CENTER,layout.LEFT_POS,
                                  []layout.DialogPage{ expDef }, nil, 300, 300 )
     if err != nil {

@@ -154,7 +154,7 @@ func newSearchReplaceArea( ) *gtk.Widget {
                                               },
                         }
 
-    searchArea, err = layout.MakeLayout( &gd )
+    searchArea, err = layout.NewLayout( &gd )
     if err != nil {
         log.Fatalf( "newSearchReplaceArea: Unable to create layout: %v\n", err )
     }
@@ -196,7 +196,7 @@ func hideSearchArea( ) {
     removeHighlights()
     releaseSearchFocus( )
     areaVisible = false
-    searchArea.View( false )
+    searchArea.SetVisible( false )
     searchArea.SetItemValue( "wrapAround", getBoolPreference( WRAP_MATCHES ) )
 }
 
@@ -328,7 +328,7 @@ func highlightSearchResults( showReplace bool ) {
     if err != nil {
         log.Fatalf("highlightSearchResults: unable to change replace visibility: %v", err)
     }
-    searchArea.View( true )
+    searchArea.SetVisible( true )
     replaceVisible = showReplace
 
     removeHighlights()

@@ -1,0 +1,164 @@
+package edit // import "github.com/jrm-1535/hexed/internal/edit"
+
+Package edit provides primitives for editing (inserting, deleting,
+replacing, copying. cutting, pasting, undoing, redoing) any sequence of
+bytes.
+
+TYPES
+
+type Clipboard interface {
+	Size() int64     // return clipboard current content size
+	Set(data []byte) // overwrite clipboard content with data slice
+	Get() byte       // read one byte at a time from clipboard [0:size]
+}
+    clipboard interface required for cutting to and pasting from.
+
+type Storage struct {
+	// Has unexported fields.
+}
+    Storage object required for any operation.
+
+func InitStorage(path string, clip Clipboard) (*Storage, error)
+    InitStorage performs the storage initialization. The argument path is a path
+    to a file containing data bytes to edit. The argument clip is the clipboard
+    interface to use when cutting, copying or pasting. In case path is empty, an
+    initially empty storage is returned. An error is returned if the file
+    corresponding to the path cannot be read, otherwise the whole file is read
+    in memory, and the new storage is returned.
+
+func (s *Storage) AreUndoRedoPossible() (u, r bool)
+    Checks whether Undo and/or Redo are possible and return a tuple (undo, redo)
+    indicating the state of each.
+
+func (s *Storage) CopyBytesAt(pos, n int64) error
+    CopyBytesAt implements a copy operation, from storage to the clipboard. It
+    copies the number of bytes given by the argument n, starting at position
+    given by the argument pos from the storage, to the clipboard. Since this
+    operation has no effect on the storage (nothing is added, removed or
+    replaced), it is not possible to undo or redo it, and no tag is needed. An
+    error is returned if the segment to copy does not fit in storage.
+
+func (s *Storage) CutBytesAt(pos, tag, n int64) error
+    CutBytesAt implements a cut operation, from the storage to the clipboard. It
+    moves the number of bytes given by the argument n, starting at position
+    given by the argument pos from the storage, to the clipboard. The arguments
+    pos and tag are saved and returned when undoing or redoing the operation. An
+    error is returned if the segment to delete does not fit in storage.
+
+func (s *Storage) DeleteByteAt(pos, tag int64) error
+    DeleteByteAt deletes one byte in the storage at position given by the
+    argument pos. The arguments pos and tag are saved and returned when undoing
+    or redoing the operation. An error is returned if the position is out of
+    storage.
+
+func (s *Storage) DeleteBytesAt(pos, tag, n int64) error
+    DeleteBytesAt deletes multiple bytes in the storage at position given by the
+    argument pos. The segment to delete is defined by the starting pposition and
+    the number of bytes n. The arguments pos and tag are saved and returned when
+    undoing or redoing the operation. An error is returned if the segment to
+    delete does not fit in storage.
+
+func (s *Storage) GetData(start, beyond int64) []byte
+    GetData returns the current storage content. Beware, it is only a shallow
+    copy: do NOT MODIFY the returned data
+
+func (s *Storage) InsertByteAt(pos, tag int64, b byte) error
+    InsertByteAt inserts a single byte in the storage at position given by the
+    argument pos. The arguments pos and tag are saved and returned when undoing
+    or redoing the operation. The argument b is the byte to insert. An error is
+    returned if the position is out of storage.
+
+func (s *Storage) InsertBytesAt(pos, tag int64, b []byte) error
+    InsertBytesAt inserts multiple bytes in the storage at position given by the
+    argument pos. The arguments pos and tag are saved and returned when undoing
+    or redoing the operation. The argument b is the byte slice to insert. An
+    error is returned if the position is out of storage.
+
+func (s *Storage) InsertClipboardAt(pos, tag int64) error
+    InsertClipboardAt implements a paste operation, inserting clipboard content
+    at the given position in storage data. The arguments pos and tag are saved
+    and returned when undoing or redoing the operation. An error is returned if
+    the position is out of storage.
+
+func (s *Storage) IsDirty() bool
+    return whether storage is presumed modified since creation/reload.
+
+func (s *Storage) Length() int64
+    return current storage length.
+
+func (s *Storage) Redo() (pos, tag int64, err error)
+    Redo does again the last undone operation. The position and tag provided
+    when the operation was initially requested are returned to the caller. An
+    error is returned if no operation can be redone.
+
+func (s *Storage) Reload(path string) error
+    Reload performs storage re-initialization. It is used for example when
+    reverting to the original data file. The original path must be provided. An
+    error is returned if the file corresponding to the path cannot be read.
+
+func (s *Storage) ReplaceByteAt(pos, tag int64, b byte) error
+    ReplaceByteAt replaces one byte in the storage at position given by the
+    argument pos. It has the same effect as deleting one byte and inserting
+    another one at the same location. The argument pos gives the location of the
+    byte to replace. The arguments pos and tag are saved and returned when
+    undoing or redoing the operation. The argument b is the byte that should
+    replace the one deleted. An error is returned if the position is outside
+    storage.
+
+func (s *Storage) ReplaceByteAtAndEraseFollowingBytes(pos, tag int64, b byte,
+	n int64) error
+    ReplaceByteAtAndEraseFollowingBytes replaces the first byte in storage at
+    the location given by the argument pos with the given byte b, and erases the
+    number of following bytes given by the argument n. This is used in case of
+    replace editing mode when a selection is replaced by a single byte. This is
+    treated as a replaceBytesAt in order to allow undo/redo as usual, but the
+    caller does not have to create an extra, potentially large, slice full of
+    zeros. An error is returned if the segment to replace does not fit in
+    storage.
+
+func (s *Storage) ReplaceBytesAt(pos, tag, dl int64, b []byte) error
+    ReplaceBytesAt replaces multiple bytes in the storage at position given by
+    the argument pos. It has the same effect as deleting a segment of bytes in
+    storage and inserting a new segment of bytes at the same location. The
+    arguments pos and dl indicate the starting point and the length of the data
+    segment in storage respectively. The arguments pos and tag are saved and
+    returned when undoing or redoing the operation. The argument b is the slice
+    of bytes that should be inserted after the segment is deleted. An error is
+    returned if the segment to replace does not fit in storage.
+
+func (s *Storage) ReplaceBytesAtMultipleLocations(pos []int64, tag, dl int64,
+	b []byte) error
+    ReplaceBytesAtMultipleLocations replaces multiple bytes at multiple
+    locations given by a slice of positions. It has the same effect as repeating
+    deleting a segment of bytes in storage then inserting a new segment of bytes
+    at the same location, for each position in the slice. The argument pos is
+    the slice of position where replacement should happen. The argument dl
+    indicates the length of bytes to delete ar eacj position, and the argument b
+    is the new slice of data byte that should replace the deleted ones. When
+    undoing or redoing the operation the first position (that is pos[0]) and tag
+    are returned. An error is returned if any segment to replace does not fit in
+    storage and no replacement occurs.
+
+func (s *Storage) ReplaceWithClipboardAt(pos, tag, dl int64) error
+    ReplaceWithClipboardAt replaces a segment of data bytes in storage with the
+    content of the clipboard. It has the same effect as deleting the segment and
+    inserting the content of the clipboard at the same location. The arguments
+    pos and dl indicate the starting point and the length of the data segment in
+    storage respectively. The arguments pos and tag are saved and returned when
+    undoing or redoing the operation. An error is returned if the segment to
+    replace does not fit in storage.
+
+func (s *Storage) SetNotifyDataChange(f func())
+    attach a notification triggered each time data changes in storage.
+
+func (s *Storage) SetNotifyLenChange(f func(int64))
+    attach a notification triggered each time the storage length changes.
+
+func (s *Storage) SetNotifyUndoRedoAble(f func(u, r bool))
+    attach a notification triggered each time the undo/redo capability changes.
+
+func (s *Storage) Undo() (pos, tag int64, err error)
+    Undo undo the last operation done on the storage. The position and tag
+    provided when the operation was requested are returned to the caller. An
+    error is returned if no operation can be undone.
+

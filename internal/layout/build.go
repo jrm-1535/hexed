@@ -1,3 +1,23 @@
+// Package layout provides primitives for creating complex dialogs using gotk3
+//
+// The package provides 3 different kind of objects:
+//  - Layout that provides the dialog widgets (button, text entry, etc)
+//  - Dialog that provides the top level dialog window and contains a layout.
+//  - History that provides a way to keep previous inputs in a last recently
+//    used order.
+//
+// A Layout is given as a tree of high level widget descriptions. Those widgets
+// can be:
+//  - a presentation of constant value, boolean, integer or text.
+//  - a presentation of an input field, boolean, integer, text or button.
+//  - a container of widgets, box or grid.
+//
+// Each widget has a name and a horizontal padding on the left side. Widgets
+// containing texts have a format definition allowing basic formatting. Input
+// widgets have a changed callback called whenever the input has been modified.
+//
+// Once created all widgets are accessible by the name given in their
+// description and can be modified programaticaly.
 package layout
 
 import (
@@ -21,19 +41,18 @@ import (
 */
 type BoxDef struct {
     Name        string          // used to manipulate item after creation
-
     Padding     uint            // left padding in parent box or cell
-
     Margin      int             // first/last item and box (within direction)
     Spacing     uint            // spacing between items
     Title       string          // optional frame title
     Border      bool            // visible frame around box
-
     Direction   Orientation     // box orientation (HORIZONTAL/VERTICAL)
-    ItemDefs    []interface{}   // *boxDef, *gridDef,  *constDef or *inputDef
+    ItemDefs    []interface{}   // *boxDef, *gridDef, *constDef or *inputDef
 }
 
 type Orientation gtk.Orientation
+
+// Box orientation
 const (
     HORIZONTAL  Orientation = Orientation(gtk.ORIENTATION_HORIZONTAL)
     VERTICAL                = Orientation(gtk.ORIENTATION_VERTICAL)
@@ -53,27 +72,30 @@ const (
 */
 type GridDef struct { 
     Name        string          // used to manipulate item after creation
-
     Padding     uint            // left padding in parent box or cell
-
     H           HorizontalDef   // defines the columns
     V           VerticalDef     // defines the rows
 }
 
+// Grid horizontal definition (columns and spacing between them)
 type HorizontalDef struct {
     Spacing     uint            // space between columns
     Columns     []ColDef        // list of column definitions
 }
 
+// Grid vertical definition (rows and spacing between them)
 type VerticalDef struct {
     Spacing     uint            // space between rows
     Rows        []RowDef        // list of row definitions
 }
 
+// Column definition (whether it should expand to fill up extra space)
 type ColDef struct {
     Expand      bool            // whether to expand if extra room available
 }
 
+// Row definition (whether it should expand to fill up extra space, and list of
+// items: *boxDef, *gridDef, *constDef or *inputDef)
 type RowDef struct {
     Expand      bool            // whether to expand if extra room available
     Items       []interface{}   // row items
@@ -92,26 +114,22 @@ type RowDef struct {
         a press button or a toggle button. The button value is alaways a bool,
         always true for a press button, the toggle state for a toggle button.
 */
+
+// Constant item definition (text, integer or boolean)
 type ConstDef struct {          // constant field (ouput only)
     Name        string          // internal name to get or set the text
-
     Padding     uint            // left padding in parent box or cell
-
     Value       interface{}     // bool, int, string
-
     ToolTip     string          // possible constant description
     Format      *TextFmt        // presentation format (int & string)
 }
 
+// Input item definition (text, integer, boolean or button)
 type InputDef struct {          // user modifiable field
     Name        string          // use to manipulate item after creation
-
     Padding     uint            // left padding in parent box or cell
-
-
     Value       interface{}     // initial value (bool, int, string, or
                                 // initial button label (textDef or iconDef)
-
     ToolTip     string          // input help for users
     Changed     func( name string, val interface{} ) bool // change notification
                                 // val is same type as value or in case of
@@ -131,15 +149,18 @@ type TextFmt struct {           // text formatted in a rectangular frame
 }
 
 type FontAttr uint
+
+// Font attribute
 const (
     REGULAR FontAttr = 0
     MONOSPACE FontAttr = 1 << iota
     BOLD
     ITALIC
-// TODO: Add basic color?
 )
 
 type AlignAttr uint
+
+// Text alignment
 const (
     LEFT AlignAttr = iota
     CENTER
@@ -152,33 +173,32 @@ type TextDef    struct {
     Format      *TextFmt
 }
 
+// Icon for buttons
 type IconDef    struct {
     Name        string          // stock icon name
 }
 
-const (
-    MAX_SELECTION_LENGTH = 63                   // in bytes
-    MAX_TEXT_LENGTH = 2 * MAX_SELECTION_LENGTH  // in nibbles
-    MAX_STORE_ROW = 9                           // 10 entries  (0-9)
-)
-
-// input control types (no control for boolean)
-type IntCtl struct {            // for integer input (from Min to Max by Inc)
-    InputMin    int             // minimum value acceptable
-    InputMax    int             // maximum value acceptable
+// Integer input from a range of acceptable values
+type IntCtl struct {
+    InputMin    int             // minimum acceptable value
+    InputMax    int             // maximum acceptable value
     InputInc    int             // increment between acceptable values
 }
 
-type IntList struct {           // for integer input (from list w/wo entry)
+// Integer input from a list of acceptable values
+type IntList struct {
     List        []int           // initial list of integer
-    FreeEntry   bool            // whether non-list entry is accepted
+    FreeEntry   bool            // whether non-list entry is also accepted
 }
 
-type StrCtl struct {            // for string input (entry with length control)
+// String input, free up to a maximum number of characters
+type StrCtl struct {
     InputMax    int
 }
 
 type KeyModifier uint           // Key-modifier bitmask
+
+// Key modifier
 const (
     SHIFT = KeyModifier(gdk.SHIFT_MASK)     // 1
     LOCK = KeyModifier(gdk.LOCK_MASK)       // 2
@@ -186,14 +206,16 @@ const (
     ALT = KeyModifier(gdk.MOD1_MASK)        // 8
 )
 
-type StrList struct {           // for string input (from list w/wo entry)
+// String input from a list of acceptable values
+type StrList struct {
     List        []string        // initial list of strings
-    FreeEntry   bool            // whether non-list entry is accepted
+    FreeEntry   bool            // whether non-list entry is also accepted
     InputMax    int             // maximum free entry length
     MouseBut    func( name string, but gdk.Button ) bool
     KeyPress    func( name string, key uint, mod KeyModifier) bool
 }
 
+// Button behavior control (press or toggle)
 type ButtonCtl struct {
     Toggle      bool            // whether button press toggles its state
     Initial     bool            // if toggle, initial toggle state
@@ -384,6 +406,7 @@ func isKeyHexa( keyVal uint ) (hexa bool) {
     return true
 }
 
+// HexFilter fiters out keys that are not hexadecimal [0-9]|[A-F]|[a-f]
 func HexaFilter( key uint, mod KeyModifier ) bool {
     switch key {
     case gdk.KEY_Home, gdk.KEY_End, gdk.KEY_Left, gdk.KEY_Right,
@@ -843,6 +866,10 @@ func (lo *Layout)addItemToGrid( dg *DataGrid, c, r int,
     return
 }
 
+// DataGrid is an opaque data type used to refer of a specific grid in a Layout.
+// It is returned by GetItemValue when the item name matches a grid definition.
+// It is used with SetRowVisible and SetColVisible to control the visibility of
+// grid rows and columns.
 type DataGrid struct {
     grid        *gtk.Grid
 
@@ -852,6 +879,7 @@ type DataGrid struct {
     rowItems    [][]*itemReference
 }
 
+// Layout is an opaque data type used to refer to the whole widget layout.
 type Layout struct {
     root   gtk.IWidget
     access map[string]*itemReference
@@ -892,6 +920,35 @@ func (lo *Layout) addGridItem( def *GridDef ) (ir *itemReference, err error) {
     } else {
         ir = &itemReference{ nil, false, dg.grid }
     }
+    return
+}
+
+// NewLayout takes a complete definition of the layout, typically a BoxDef or
+// a GridDef, and recursively builds the layout based on the content of that
+// definition. It returns an error if any definition encountered during building
+// is invalid ot unsupported otherwise it returns the new Layout.
+func NewLayout( def interface{} ) (layout *Layout, err error) {
+
+    layout = new(Layout)
+    layout.access = make( map[string]*itemReference )
+
+    var itemRef *itemReference
+    switch def := def.(type) {
+    case *GridDef:
+        itemRef, err = layout.addGridItem( def )
+    case *BoxDef:
+        itemRef, err = layout.addBoxItem( def )
+    case *ConstDef:
+        itemRef, err = layout.addConstItem( def )
+    case *InputDef:
+        itemRef, err = layout.addInputItem( def )
+    default:
+        return nil, fmt.Errorf( "makeLayout: unsupported type %T\n", def )
+    }
+    if err != nil {
+        return nil, fmt.Errorf( "makeLayout: unable to make root: %v", err )
+    }
+    layout.root = itemRef.item.(gtk.IWidget)
     return
 }
 
