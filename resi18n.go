@@ -167,6 +167,8 @@ const (
     dialogExploreFloat32
     dialogExploreFloat64
 
+    dialogAboutDescription
+
     buttonOk
     buttonCancel
     buttonSave
@@ -424,6 +426,8 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "float 32",                                             // dialogExploreFloat32
     "float 64",                                             // dialogExploreFloat64
 
+    "A small binary file editor",                           // dialogAboutDescription
+
     "Yes",                                                  // buttonOk
     "Cancel",                                               // buttonCancel
     "Save",                                                 // buttonSave
@@ -620,6 +624,8 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Reél",                                                 // dialogExploreReal
     "flottant 32",                                          // dialogExploreFloat32
     "flottant 64",                                          // dialogExploreFloat64
+
+    "Un petit editeur de fichiers binaires",                // dialogAboutDescription
 
     "Oui",                                                  // buttonOk
     "Annuler",                                              // buttonCancel

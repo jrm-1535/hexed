@@ -72,13 +72,7 @@ func initActions( nItems int ) {
         printDebug( "Action: help content called\n" )
     }
     actions["contents"] = helpAction
-
-    aboutAction := func( ) {
-        printDebug( "Action: help about called\n" )
-//        aboutDialog( )
-//        refreshMenus()
-    }
-    actions["about"] = aboutAction
+    actions["about"] = aboutDialog
 }
 
 func enablePreferences( state bool ) {
