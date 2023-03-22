@@ -32,6 +32,14 @@ func setHexedHome( ) {
         log.Panicln( "Unable to get $HOME" )
     }
     hexedHome = filepath.Join( home, HEXED_HOME )
+    info, err := os.Stat( hexedHome )
+    if err != nil || ! info.IsDir() {
+        os.Rename( hexedHome, hexedHome + "~" ) // ignore errors
+        err = os.Mkdir( hexedHome, 0750 )
+        if err != nil {
+            log.Fatalf( "setHexedHome: unable to set hexed directory: %v", err )
+        }
+    }
 }
 
 func appendAvailableThemes( path string, paths *[]string ) (err error) {

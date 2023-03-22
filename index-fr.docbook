@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<article xmlns="http://docbook.org/ns/docbook" version="5.0" xml:lang="fr" id="index">
+  <articleinfo>
+    <title>Hexed un éditeur de fichiers binaires</title>
+    <revhistory>
+      <revision lang="en">
+        <revnumber>hexed V1.0</revnumber>
+        <date>2023</date>
+        <revdescription>
+          <para role="author" lang="en">Jean-Rene Menand<email>jrmenand@yahoo.com</email></para>
+          <para role="publisher" lang="en">GNOME Documentation Project</para>
+        </revdescription>
+      </revision>
+    </revhistory>
+    <releaseinfo lang="en"> This manual describes hexed version 1.0.</releaseinfo>
+  </articleinfo>
+  <indexterm lang="en"><primary>hexed</primary></indexterm>
+  <indexterm lang="en"><primary>text editor</primary></indexterm>
+
+<!-- ============= Document Body ============================= -->
+<!-- ============= Introduction ============================== -->
+  <sect1 id="hexed-intro">
+    <title>Introduction</title>
+	 <para>L'application <application>hexed</application> permet de créer et d'éditer des fichiers binaires.</para>
+	 <para>Le but de <application>hexed</application> est d'être un éditeur de fichiers binaires simple et facile à utiliser.</para>
+  </sect1>
+
+<!-- ============= Getting Started =========================== -->
+  <sect1 id="hexed-getting-started">
+    <title>Premiers pas</title>
+
+<!-- ============= To Start xed ============================ -->
+    <sect2 id="hexed-to-start">
+      <title>Démarrage d'hexed</title>
+      <para><application>hexed</application> peut être démarré de la façon suivante :</para>
+      <variablelist>
+        <varlistentry>
+          <term>Par le menu <guimenu>Applications</guimenu></term>
+          <listitem>
+            <para>Choisissez <menuchoice><guimenu>Accessoires</guimenu><guimenuitem>Éditeur binaire</guimenuitem></menuchoice>.</para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>En ligne de commande</term>
+          <listitem>
+            <para>Exécutez la commande : <command>hexed</command></para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+      <para>Par défaut, lorsque l'on ouvre un document de type binaire dans le gestionnaire de fichiers, hexed se lance et l'affiche.</para>
+    </sect2>
+
+    <sect2 id="xed-when-you-start">
+      <title>Fenêtre d'hexed</title>
+      <para>Lorsque vous ouvrez un fichier binaire avec <application>hexed</application>, la fenêtre suivante apparaît :</para>
+
+      <figure id="xed-window">
+        <title>Fenêtre principale d'hexed</title>
+        <screenshot>
+          <mediaobject lang="en">
+            <imageobject>
+              <imagedata fileref="hexed_window-fr.png" format="PNG"/>
+            </imageobject>
+            <textobject> <phrase>Shows hexed main window.</phrase></textobject>
+          </mediaobject>
+        </screenshot>
+      </figure>
+
+      <para>Elle contient les éléments suivants :</para>
+        <variablelist>
+
+          <varlistentry>
+            <term>La barre de menus</term>
+            <listitem>
+              <para>La barre de menu contient toutes les commandes nécessaires pour travailler avec des fichiers dans <application>hexed</application>.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>La zone d'édition</term>
+            <listitem>
+              <para>La zone d'édition contient la representation en hexadécimal du document en cours d'édition.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>La zone d'affichage en charactères</term>
+            <listitem>
+              <para>La zone d'affichage contient la representation en charactères ASCII du document en cours d'édition.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>La barre d'état</term>
+            <listitem>
+              <para>La barre d'état contient des informations sur l'activité en cours dans <application>hexed</application> ainsi que des informations contextuelles sur les éléments de menu. Elle affiche également les informations suivantes :</para>
+            <itemizedlist>
+              <listitem>
+                <para>Position de curseur : adresse en hexadecimal où se trouve le curseur.</para>
+              </listitem>
+              <listitem>
+                <para>Mode d'édition, seulement si le fichier est modifiable : Si l'éditeur est en mode insertion, la barre d'état contient le mot <guilabel>INS</guilabel>. S'il est en mode écrasement, la barre d'état contient le mot <guilabel>ECR</guilabel>. Appuyez sur la touche <keycap>Insert</keycap> pour changer de mode d'édition.</para>
+              </listitem>
+              <listitem>
+                <para>Protection : Si le fichier est seulement lisible, sans modification possible, la barre d'état contient le mot <guilabel>LEC</guilabel>. S'il est modifiable, la barre d'état contient le mot <guilabel>MOD</guilabel>. Par défaut, le fichier est ouvert en mode lecture seule. Le menu <menuchoice><guimenu>Edition</guimenu><guimenuitem>Passer en mode Modification</guimenuitem></menuchoice> permet de changer de mode d'opération.</para>
+              </listitem>
+            </itemizedlist>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+      <para>Lorsque vous cliquez avec le bouton droit dans sa fenêtre, <application>hexed</application> affiche un menu contextuel. Celui-ci contient les commandes les plus courantes, selon le mode courant d'opération.</para>
+    </sect2>
+
+<!-- ============= To Open Multiple Files from the Command Line ========= -->
+    <sect2 id="hexed-run-from-cmd-line">
+      <title>Lancement d'hexed depuis la ligne de commande</title>
+      <para>Il est possible de lancer <application>hexed</application> à partir de la ligne de commande, et d'ouvrir un ou plusieurs documents. Pour cela, saisissez la commande suivante et appuyez sur <keycap>Entrée</keycap> :</para>
+      <para><command>hexed <replaceable>fichier1 fichier2 fichier3</replaceable></command></para>
+<!--    <para>Vous pouvez également indiquer un URI au lieu d'un nom de fichier.</para> -->
+      <para>Il est aussi possible to restreindre <application>hexed</application> à rester en mode protégé (<guilabel>LEC</guilabel>) avec l'option <command>-ro</command> :</para>
+      <para><command>hexed -ro <replaceable>fichier1 fichier2</replaceable></command></para>
+    </sect2>
+  </sect1>
+
+
+<!-- ================ Usage ================================ -->
+  <sect1 id="hexed-usage">
+    <title>Travailler avec des fichiers</title>
+
+<!-- ============= To Create a New File ======================== -->
+    <sect2 id="hexed-create-new-file">
+      <title>Création d'un nouveau fichier binaire</title>
+      <para>Pour créer un nouveau fichier, choisissez <menuchoice><guimenu>Fichier</guimenu><guimenuitem>Nouveau</guimenuitem></menuchoice>. Un document vide s'affiche alors dans la fenêtre d'<application>hexed</application>.</para>
+    </sect2>
+
+<!-- ============= To Open a File ============================= -->
+    <sect2 id="hexed-open-file">
+      <title>Ouverture d'un fichier</title>
+      <para>Vous pouvez ouvrir vos fichiers dans hexed plusieurs façons :</para>
+      <itemizedlist>
+        <listitem>
+          <para>Pour ouvrir un fichier, choisissez <menuchoice><guimenu>Fichier</guimenu><guimenuitem>Ouvrir</guimenuitem></menuchoice> afin d'afficher la boîte de dialogue <guilabel>Ouvrir des fichiers</guilabel>. Sélectionnez le fichier à ouvrir, puis cliquez sur <guibutton>Ouvrir</guibutton>. Le fichier est affiché dans la fenêtre d'<application>hexed</application>.</para>
+        </listitem>
+        <listitem>
+          <para>Il est aussi possible d'ouvrir un fichier en cliquant sur son nom ou son icone dans le gestionnaire de fichier et en le relachant sur la fenêtre d'hexed.</para>
+        </listitem>
+<!-- -->
+        <listitem>
+          <para>L'historique des 5 derniers fichiers ouverts est conservée par <application>hexed</application> et leur nom est listé dans le menu <menuchoice><guimenu>Fichier</guimenu><guimenuitem>Recemment ouvert</guimenuitem></menuchoice>. </para>
+        </listitem>
+<!-- -->
+      </itemizedlist>
+		<note>
+          <para>Comme il est possible d'ouvrir plusieurs documents dans <application>hexed</application>, l'application ajoute un onglet dans la fenêtre pour chaque document ouvert. Pour plus d'informations à ce sujet, consultez <xref linkend="hexed-tabs"/>.</para>
+        </note>
+    </sect2>
+
+<!-- ============= To Save a File ============================== -->
+    <sect2 id="hexed-save-file">
+      <title>Enregistrement d'un fichier</title>
+      <para>Vous pouvez enregistrer vos fichiers de plusieurs façons :</para>
+      <itemizedlist>
+        <listitem>
+          <para>Pour enregistrer les changements d'un fichier existant, choisissez <menuchoice><guimenu>Fichier</guimenu><guimenuitem>Enregistrer</guimenuitem></menuchoice>.</para>
+        </listitem>
+        <listitem>
+          <para>Pour enregistrer in nouveau fichier ou pour enregister une fichier existant sous un autre nom, choisissez <menuchoice> <guimenu>Fichier</guimenu> <guimenuitem>Enregistrer sous</guimenuitem> </menuchoice>. Entrez un nom pour le fichier dans le dialogue <guilabel>Save As</guilabel> puis cliquez sur le bouton <guibutton>Save</guibutton>. </para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+<!-- ============= Working with tabs ======================== -->
+    <sect2 id="hexed-tabs">
+      <title>Utilisation des onglets</title>
+      <para><application>hexed</application> affiche un <firstterm>onglet</firstterm> au dessus de la zone d'affichage pour chaque fichier ouvert. Quand il y a plus d'un fichier ouvert, pour passer d'un fichier à un autre, cliquez sur son onglet.</para>
+	 </sect2>
+
+  </sect1>
+
+
+  <sect1 id="hexed-editing">
+    <title>Modifier le contenu d'un fichier binaire</title>
+
+<!-- ============= To Edit Text ================================ -->
+    <sect2 id="hexed-edit">
+      <title>Édition</title>
+        <para>Le <firstterm>curseur d'insertion</firstterm> indique l'endroit où une action va se faire. Quand le fichier est ouvert il est positionné à l'adresse 0. Pour modifier la position de ce curseur, utilisez les touches fléchées, les touches Home, End, Page Up, Page Down ou cliquez avec la souris. </para>
+        <para>Vous pouvez éditer le contenu d'un fichier de plusieurs façons :</para>
+        <itemizedlist>
+          <listitem>
+            <para>Entrez des chiffres hexadecimaux (1, 2, ..., 9, a ou A, b ou B, ..., f ou F) à partir du clavier. Le <term>curseur d'insertion</term> indique l'endroit où le chiffre tapé est inséré ou remplace le chiffre present dans le fichier, selon le mode d'édition.</para>
+          </listitem>
+          <listitem>
+            <para>Tapez sur la touche Delete ou Backspace du clavier pour supprimer le chiffre qui suit le <term>curseur d'insertion</term> ou qui le précède respectivement. </para>
+            <note>
+              <para>L'unité d'insertion ou de suppression dans un fichier binaire est l'octet, qui comprend 2 chiffres hexadécimaux. Si l'éditeur est en mode "insertion", il peut seulement insérer ou supprimer un octet complet, bien que l'entrée soit seulement un chiffre. Pour ce faire, il crée un octet en ajoutant 0 comme chiffre manquant, et place le curseur sur ce 0. C'est seulement quand le second chiffre est entré que l'insertion est complète. De manière similaire quand un chiffre est supprimé, il remplace seulement le premier chiffre par un zero et déplace le curseur. C'est seulement quand le second chiffre est supprimé que la suppression est complète et l'octet est enlevé du fichier. </para>
+            </note>
+          </listitem>
+
+          <listitem>
+            <para>Sélectionnez avec la souris (cliquez avec le bouton gauche et maintenez le enfoncé) une partie du fichier binaire pour la copier ailleur, la déplacer ou la supprimer.</para>
+            <note>
+              <para>Pour Sélectionner tout le contenu du fichier, choisissez <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Sélectionner Tout</guimenuitem> </menuchoice>. </para>
+            </note>
+		    <itemizedlist>
+              <listitem>
+                <para> Pour copier la partie selectionnée du fichier dans le presse-papier, choisissez <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Copier</guimenuitem> </menuchoice>.</para>
+              </listitem>
+              <listitem>
+                <para> Pour supprimer la partie selectionnée du fichier et la placer dans le presse-papier, choisissez <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Couper</guimenuitem> </menuchoice>.</para>
+              </listitem>
+
+              <listitem>
+                <para>Une fois placée dans le presse-papier, cette partie du fichier peut etre inserée à l'emplacement du curseur d'impression en choisissant <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Coller</guimenuitem> </menuchoice>.</para>
+              </listitem>
+
+              <listitem>
+                <para>Pour juste supprimer la partie selectionnée du fichier, choisissez <menuchoice> <guimenu>Edition</guimenu><guimenuitem>Supprimer</guimenuitem></menuchoice>.</para>
+              </listitem>
+
+            </itemizedlist>
+          </listitem>
+		</itemizedlist>
+        <note>
+          <para>Les commandes couper, copier, coller et supprimer sont aussi accessible par le menu contextuel qui s'affiche en cliquant avec le bouton droit de la souris. </para>
+        </note>
+	 </sect2>
+
+<!-- ============== To Undo or Redo Edits ====================== -->
+    <sect2 id="hexed-undo-redo-edits">
+      <title>Annulation et rétablissement des modifications</title>
+      <para>Pour annuler une modification du fichier que vous avez faite you have, choisissez <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Annuler</guimenuitem> </menuchoice>. To annuler cette annulation, choisissez <menuchoice> <guimenu>Edition</guimenu> <guimenuitem>Refaire</guimenuitem> </menuchoice>.</para>
+    </sect2>
+
+  </sect1>
+
+  <sect1 id="hexed-find">
+    <title>Recherche et remplacement de séquences d'octets</title>
+
+    <para>
+      <application>Hexed</application> permet de rechercher une séquence particulière d'octets partout dans le fichier et de remplacer cette séquence d'octets par une autre. Utilisez <menuchoice> <guimenu>Recherche</guimenu><guimenuitem>Trouver</guimenuitem></menuchoice> pour trouver une séquence particulière d'octets ou <menuchoice> <guimenu>Recherche</guimenu><guimenuitem>Remplacer</guimenuitem></menuchoice> pour remplacer cette séquence.
+    </para>
+<!-- ============= To Find Text ================================ -->
+    <sect2 id="hexed-find-bytes">
+      <title>Recherche de séquences d'octets</title>
+      <para>Pour rechercher une séquence particulière d'octets partout dans le fichier, procédez comme suit :</para>
+      <orderedlist>
+        <listitem>
+          <para>Choisissez <menuchoice> <guimenu>Recherche</guimenu> <guimenuitem>Trouver</guimenuitem> </menuchoice> pour présenter le dialogue <guilabel>Chercher</guilabel>.</para>
+        </listitem>
+        <listitem>
+          <para>Saisissez la séquence d'octets à rechercher dans le champ <guilabel>Chercher les charactères hexa</guilabel>. La recherche est incrémentale : au fur et à mesure que la séquence est saisie le contenu de la page change pour surligner la séquence d'octet dans le fichier.</para>
+        </listitem>
+        <note>
+          <para>Puisque l'unité de donnée dans un fichier est un octet, la séquence d'octets à rechercher est considérée comme la plus grande chaine de charactères hexa paire entrée dans le champ <guilabel>Chercher les charactères hexa</guilabel>. Si un nombre impair de charactères hexa est entré, le dernier est ignoré pour la recherche.</para>
+        </note>
+        <listitem>
+          <para>Une fois la saisie complète, la première position de la séquence d'octets après le curseur est visible et le nombre d'occurences est indiqué dans la barre d'état.</para>
+        </listitem>
+        <listitem>
+          <para>Pour aller à l'occurrence suivante de la séquence d'octets, cliquez sur le bouton <guibutton>Suivant</guibutton>. Pour aller à l'occurrence précédente de la séquence d'octets, cliquez sur le bouton <guibutton>Précédent</guibutton>.</para>
+        </listitem>
+      </orderedlist>
+      <para>Une fois la recherche terminée, vous pouvez fermer le dialogue <guilabel>Chercher</guilabel> et enlever le surlignage en cliquant sur le bouton <guibutton>x</guibutton> à l'extrème droite.</para>
+    </sect2>
+
+<!-- ============= To Find and Replace Text =================== -->
+    <sect2 id="hexed-find-replace-bytes">
+      <title>Remplacement de séquences d'octets</title>
+
+      <para>Pour remplacer une séquence particulière d'octets dans le fichier, procédez comme suit :</para>
+      <orderedlist>
+        <listitem>
+          <para>Choisissez <menuchoice> <guimenu>Recherche</guimenu> <guimenuitem>Remplacer</guimenuitem> </menuchoice> pour présenter le dialogue <guilabel>Remplace</guilabel>.</para>
+          </listitem>
+          <listitem>
+            <para>Comme pour chercher, saisissez la séquence d'octets à rechercher en entrant la chaîne de caractères hexa correspondante dans le champ <guilabel>Chercher les charactères hexa</guilabel>.</para>
+          </listitem>
+          <listitem>
+            <para>Saisissez dans le champ <guilabel>Remplacer par la chaine hexa</guilabel> la chaîne de caractères hexa devant remplacer la cla séquence d'octets recherchée.</para>
+          </listitem>
+        </orderedlist>
+
+        <para>Comme précédemment, la recherche est incrémentale et la premiere occurence de la séquence cherchée est surlignée. Les deux chaines de caractères hexa, celle à rechercher et celle de remplacement, sont tronquées à la plus grande séquence de bytes correspondante.</para>
+		<para>Pour examiner chaque occurrence da la la séquence d'octets cherchée avant de le remplacer, cliquez sur le bouton <guibutton>Suivant</guibutton> ou le bouton <guibutton>Précédent</guibutton>. Lorsqu'une séquence à remplacer est trouvée, cliquez sur le bouton <guibutton>Remplace</guibutton> pour effectuer le remplacement. <application>Hexed</application>  passee automatiquement à l'occurrence suivante.</para>
+		<para>Pour remplacer toutes les occurrences de la la séquence d'octets dans l'ensemble du fichier, cliquez sur le bouton <guibutton>Remplace tous</guibutton>.</para>
+	 </sect2>
+
+<!-- ============= Find and Replace Options ============================ -->
+    <sect2 id="xed-find-options">
+      <title>Options de recherche et de remplacement.</title>
+      <para>Les fenêtres de dialogue <guilabel>Rechercher</guilabel> et <guilabel>Remplacer</guilabel> offrent la possibilité de faire une recherche circulaire pour que lorsqu'une recherche atteint une extrémité du fichier, elle se poursuive en reprenant à partir de l'autre extrémité.</para>
+      <itemizedlist>
+        <listitem>
+          <para>Pour faire une recherche circulaire, sélectionnez le bouton circulaire à droite du <guibutton>Précédent</guibutton></para>
+        </listitem>
+        <listitem>
+          <para>Pour faire une recherche non circulaire, désélectionnez le bouton circulaire à droite du <guibutton>Précédent</guibutton></para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+<!-- ============= To Position the Cursor on a Specific Line ======================= -->
+    <sect2 id="xed-goto-line">
+      <title>Positionnement du curseur à une adresse particulière</title>
+
+      <para>Pour positionner le curseur à une adresse particulière dans le fichier courant, choisissez <menuchoice> <guimenu>Recherche</guimenu> <guimenuitem>Aller à</guimenuitem> </menuchoice>. La fenêtre de dialogue <guilabel>Aller à</guilabel> apparait.</para>
+      <para>Saisissez l'adresse où vous souhaitez placer le curseur dans le champ marqué <guilabel>Entrez l'adresse de l'octet en hexadecimal</guilabel>, et le contenu du document défile jusqu'à l'adresse indiquée.</para>
+      <para>Le positionnement se fait de facon incrémentale : au fur et à mesure que l'adresse est saisie, la position du curseur change.</para>
+      <itemizedlist>
+        <listitem>
+          <para>Pour faire disparaître la fenêtre de dialogue et placer le curseur à l'adresse indiquée, appuyez sur le bouton <guibutton>Aller</guibutton>.</para>
+        </listitem>
+        <listitem>
+          <para>Pour faire disparaître la fenêtre de dialogue et laisser le curseur à sa position d'origine, appuyez sur le bouton <guibutton>Annuler</guibutton>.</para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+  </sect1>
+
+</article>
+

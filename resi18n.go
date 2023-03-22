@@ -49,6 +49,9 @@ const (
     menuFileRevert
     menuFileRevertHelp
 
+    menuFileRecent
+    menuFileRecentHelp
+
     menuFileClose
     menuFileCloseHelp
 
@@ -218,6 +221,11 @@ const (
     languageNumber                   // must be last in this constant list
 )
 
+const (
+    USA = 0
+    FRA = 1
+)
+
 var languages [languageNumber]string = [languageNumber]string {
     "American English", "Français",
 }
@@ -307,6 +315,9 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Revert",                                               // menuFileRevert
     "revert to the last saved version of the file",         // menuFileRevertHelp
+
+    "Recent",                                               // menuFileRecent
+    "open file ",                                           // menuFileRecentHelp
 
     "Close",                                                // menuFileClose
     "close the current file",                               // menuFileCloseHelp
@@ -506,6 +517,9 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Recharger",                                            // menuFileRevert
     "recharge avec la dernière version enegistrée",         // menuFileRevertHelp
+
+    "Récemment ouvert",                                     // menuFileRecent
+    "ouvre le fichier ",                                    // menuFileRecentHelp
 
     "Fermer",                                               // menuFileClose
     "ferme le fichier courant",                             // menuFileCloseHelp

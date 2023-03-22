@@ -569,6 +569,16 @@ func NewHistory( maxDepth int ) (h *History, err error) {
     return 
 }
 
+func (h *History) Set( content []string ) error {
+    if len( content ) > cap(h.store) {
+        return fmt.Errorf( "Set history: capacity overflow (%d in %d)\n",
+                            len( content ), cap(h.store) )
+    }
+    h.store = h.store[0:0]
+    h.store = append( h.store, content... )
+    return nil
+}
+
 // Get returns the current history as a slice of strings.
 func (h *History) Get( ) []string {
     return h.store[:]

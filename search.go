@@ -481,7 +481,7 @@ func updateSearchPosition( bytePos int64 ) {
     searchPos = bytePos
     if areaVisible {
         updateReplaceButton()
-        selectFirstMatch()
+        selectCurrentMatch()
     }
 }
 
@@ -501,10 +501,12 @@ func getWrapMode( ) bool {
 // return :
 //  if next is true:
 //      the lowest match that is above the current search position or if no
-//      match exists above the current search position, the highest match
+//      match exists above the current search position, the highest match,
+//      unless wrapMode is true, in which case it returns the lowest match.
 //  if next is false:
 //      the highest match that is below the current search position or if no
-//      match exists below the current search position, the lowest one
+//      match exists below the current search position, the lowest one, unless
+//      wrapMode is true, in which case it returns the highest match.
 
 func getMatchIndex( next bool ) (matchIndex int) {
     if next {
@@ -560,7 +562,7 @@ func selectNewMatch( next bool ) {
     }
 }
 
-func selectFirstMatch( ) {
+func selectCurrentMatch( ) {
     l := len(matches)
     for i := 0; i < l; i ++ {
         if matches[i] == searchPos {
@@ -569,6 +571,25 @@ func selectFirstMatch( ) {
         }
     }
     showNoMatch( l )
+}
+
+func selectFirstMatch( ) {
+    l := len(matches)
+    if l > 0 {
+    for i := 0; i < l; i ++ {
+        if matches[i] == searchPos {
+            showHighlights( i, l, searchPos )
+            return
+        }
+    }
+    mi := getMatchIndex( true )
+    if mi >= 0 && mi < l {
+        searchPos = matches[mi]
+        showHighlights( mi, l, searchPos )
+    }
+    } else {
+        showNoMatch( 0 )
+    }
 }
 
 func (pc *pageContext) findPattern( ) {

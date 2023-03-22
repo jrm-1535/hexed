@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<article xmlns="http://docbook.org/ns/docbook" version="5.0" xml:lang="en" id="index">
+  <articleinfo>
+    <title>Hexed a binary file editor</title>
+    <revhistory>
+      <revision lang="en">
+        <revnumber>hexed V1.0</revnumber>
+        <date>2023</date>
+        <revdescription>
+          <para role="author" lang="en">Jean-Rene Menand<email>jrmenand@yahoo.com</email></para>
+          <para role="publisher" lang="en">GNOME Documentation Project</para>
+        </revdescription>
+      </revision>
+    </revhistory>
+    <releaseinfo lang="en"> This manual describes hexed version 1.0.</releaseinfo>
+  </articleinfo>
+  <indexterm lang="en"><primary>hexed</primary></indexterm>
+  <indexterm lang="en"><primary>text editor</primary></indexterm>
+
+<!-- ============= Document Body ============================= -->
+<!-- ============= Introduction ============================== -->
+  <sect1 id="hexed-intro">
+    <title>Introduction</title>
+	 <para>The <application>hexed</application> application enables you to create and edit binary files.</para>
+	 <para>The aim of <application>hexed</application> is to be a simple and easy to use binary file editor.</para>
+  </sect1>
+
+<!-- ============= Getting Started =========================== -->
+  <sect1 id="hexed-getting-started">
+    <title>Getting started</title>
+
+<!-- ============= To Start xed ============================ -->
+    <sect2 id="hexed-to-start">
+      <title>Starting hexed</title>
+      <para>You can start <application>hexed</application> the following ways:</para>
+      <variablelist>
+        <varlistentry>
+          <term><guimenu>Applications</guimenu> menu</term>
+          <listitem>
+            <para>Choose <menuchoice><guimenu>Accessories</guimenu><guimenuitem>Binary Editor</guimenuitem></menuchoice>.</para>
+          </listitem>
+        </varlistentry>
+        <varlistentry>
+          <term>Command line</term>
+          <listitem>
+            <para>Execute the command: <command>hexed</command></para>
+          </listitem>
+        </varlistentry>
+      </variablelist>
+      <para>By default, when you open a binary file in the file manager, hexed will start et display it.</para>
+    </sect2>
+
+    <sect2 id="xed-when-you-start">
+      <title>The hexed window</title>
+      <para>When you open a binary file with <application>hexed</application>, the following window is displayed:</para>
+
+      <figure id="xed-window">
+        <title>Main hexed window</title>
+        <screenshot>
+          <mediaobject lang="en">
+            <imageobject>
+              <imagedata fileref="hexed_window-en.png" format="PNG"/>
+            </imageobject>
+            <textobject> <phrase>Shows hexed main window.</phrase></textobject>
+          </mediaobject>
+        </screenshot>
+      </figure>
+
+      <para>The main hexed window contains the following elements:</para>
+        <variablelist>
+
+          <varlistentry>
+            <term>Menubar</term>
+            <listitem>
+              <para>The menus on the menubar contain all of the commands you need to work with files in <application>hexed</application>.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>Editing area</term>
+            <listitem>
+              <para>The editing area displays the content of the file as two hexadecimal digits per byte.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>ASCII display area</term>
+            <listitem>
+              <para>The ASCII display area displays the content of the file as one ASCII character per byte.</para>
+            </listitem>
+          </varlistentry>
+
+          <varlistentry> <term>Statusbar</term>
+            <listitem>
+              <para>The statusbar displays information about current <application>hexed</application> activity and contextual information about the menu items. The statusbar also displays the following information:</para>
+            <itemizedlist>
+              <listitem>
+                <para>Cursor position: the hexadecinal address where the cursor is located.</para>
+              </listitem>
+              <listitem>
+                <para>Edit mode, only if the file is not protected: If the editor is in insert mode, the statusbar contains the text INS. If the editor is in overwrite mode, the statusbar contains the text OVR. Press the <keycap>Insert</keycap> key to change edit mode.</para>
+              </listitem>
+              <listitem>
+                <para>Protected operation: if the file is protected, no modification is possible and the statusbar contains the text <guilabel>READ ONLY</guilabel>. If it is modifiable, statusbar contains the text <guilabel>READ WRITE</guilabel>. By default, a file is opened in <guilabel>READ ONLY</guilabel> mode. The menu <menuchoice><guimenu>Edit</guimenu><guimenuitem>Switch to Read Write</guimenuitem></menuchoice>allows switching to read-write mode.</para>
+              </listitem>
+            </itemizedlist>
+          </listitem>
+        </varlistentry>
+
+      </variablelist>
+      <para>When you click with the right button in the main window, <application>hexed</application> displays a contextual menu. That menu contains the most common editing commands, depending on the current operation mode.</para>
+    </sect2>
+
+<!-- ============= To Open Multiple Files from the Command Line ========= -->
+    <sect2 id="hexed-run-from-cmd-line">
+      <title>Running hexed from a Command Line</title>
+      <para>You can run <application>hexed</application> from a command line and open a single file or multiple files. To open multiple files, type fthe following command and press <keycap>Enter</keycap>:</para>
+      <para><command>hexed <replaceable>file1 file2 file3</replaceable></command></para>
+      <para>It is also possible to force <application>hexed</application> to stay in <guilabel>READ ONLY</guilabel> mode with the option <command>-ro</command> :</para>
+      <para><command>hexed -ro <replaceable>file1 file2</replaceable></command></para>
+    </sect2>
+  </sect1>
+
+
+<!-- ================ Usage ================================ -->
+  <sect1 id="hexed-usage">
+    <title>Working with files</title>
+
+<!-- ============= To Create a New File ======================== -->
+    <sect2 id="hexed-create-new-file">
+      <title>Creating a new binary file</title>
+      <para>To create a new document, choose <menuchoice><guimenu>File</guimenu><guimenuitem>New</guimenuitem></menuchoice>. A new empty file is displayed in the <application>hexed</application> main window.</para>
+    </sect2>
+
+<!-- ============= To Open a File ============================= -->
+    <sect2 id="hexed-open-file">
+      <title>Opening a file</title>
+      <para>You can open files in hexed in different ways:</para>
+      <itemizedlist>
+        <listitem>
+          <para>To open a file from the menu, choose <menuchoice><guimenu>File</guimenu><guimenuitem>Open</guimenuitem></menuchoice> to show the <guilabel>Open files</guilabel> dialog box. Select the file that you want to open, then click <guibutton>Open</guibutton>. The file is displayed in the <application>hexed</application> window.</para>
+        </listitem>
+        <listitem>
+          <para>It is also possible to open a file in hexed by clicking on its name or its icon in a file manager window and dragging it and dropping it on the <application>hexed</application> window.</para>
+        </listitem>
+<!-- -->
+        <listitem>
+          <para>The <application>hexed</application> application records the path of the last most recently opened files and list those paths in the <menuchoice><guimenu>File</guimenu><guimenuitem>Recent</guimenuitem></menuchoice>. </para>
+        </listitem>
+<!-- -->
+      </itemizedlist>
+		<note>
+          <para>As it is possible to open several files in <application>hexed</application>, the application adds a tab in the main window for each currently opened file. For more on this see <xref linkend="hexed-tabs"/>.</para>
+        </note>
+    </sect2>
+
+<!-- ============= To Save a File ============================== -->
+    <sect2 id="hexed-save-file">
+      <title>Saving a file</title>
+      <para>You can save files in the following ways:</para>
+      <itemizedlist>
+        <listitem>
+          <para>To save changes to an existing file, choose <menuchoice><guimenu>File</guimenu><guimenuitem>Save</guimenuitem></menuchoice>.</para>
+        </listitem>
+        <listitem>
+          <para>To save a new file or to save an existing file under a new filename, choose <menuchoice> <guimenu>File</guimenu> <guimenuitem>Save as</guimenuitem> </menuchoice>. Enter a name for the file in the <guilabel>Save As</guilabel> dialog, then click <guibutton>Save</guibutton>. </para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+<!-- ============= Working with tabs ======================== -->
+    <sect2 id="hexed-tabs">
+      <title>Working With Tabs</title>
+      <para><application>hexed</application> shows a <firstterm>tab</firstterm> for each opened file above the display area. When multiple files are open. to switch to another file, click on its tab.</para>
+	 </sect2>
+  </sect1>
+
+
+  <sect1 id="hexed-editing">
+    <title>Modifying a binary file</title>
+
+<!-- ============= To Edit Text ================================ -->
+    <sect2 id="hexed-edit">
+      <title>Editing files</title>
+        <para>The <firstterm>insertion cursor</firstterm> marks the location when an edition operation will happen. When a file is just opened, it is positioned at address 0. To move the cursor, press the arrow keys, the Home, End, Page Up or Page Down keys or click on thewindow with the mouse left button. </para>
+        <para>You can edit a file in several ways:</para>
+        <itemizedlist>
+          <listitem>
+            <para>Enter hexadecimal digits (1, 2, ..., 9, a or A, b or B, ..., f or F) from the keyboard. The <term>insertion cursor</term> shows where the digits entered will be inserted or will replace current digits in the file, depending on the editing mode.</para>
+          </listitem>
+          <listitem>
+            <para>Press the Delete key or the Backspace key to delete le digit following the <term>insertion cursor</term> or preceding it respectively. </para>
+            <note>
+              <para>The insertion or deletion unit in a binary file is a byte, which is made of 2 hexadeciml digits. If the editor is in "insertion" mode, it can only insert ou delete a whole byte, even though the input is only one digit. To do soe, il creates a whole byte by adding 0 as the initially missing digit, and moves the cursor to that 0. It is only when the second digit is entered that the insertion is complete. Similarly when a digit is deleted, the editor replaces only the first digit with 0 and moves the cursor. It is only when the second digit is deleted that the deletion is complete and the byte actually removed from the file. </para>
+            </note>
+          </listitem>
+
+          <listitem>
+            <para>Select with the mouse (click with the left button and keep it pressed) a part of the binary file to copy it somewhere else, to move it or to delete it.</para>
+            <note>
+              <para>To Select the whole file, choose <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Select All</guimenuitem> </menuchoice>. </para>
+            </note>
+		    <itemizedlist>
+              <listitem>
+                <para>To copy the selected part of the file to the clipboard, choose <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Copy</guimenuitem> </menuchoice>.</para>
+              </listitem>
+              <listitem>
+                <para>To delete the selected part of the file and to move it to the clipboard, choose <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Cut</guimenuitem> </menuchoice>.</para>
+              </listitem>
+
+              <listitem>
+                <para>Once in the clipboard, that part of the file can be inserted at the location marked by the <term>insertion cursor</term> by chosing <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Paste</guimenuitem> </menuchoice>.</para>
+              </listitem>
+
+              <listitem>
+                <para>To just delete the selected part of the file, choose <menuchoice> <guimenu>Edit</guimenu><guimenuitem>Delete</guimenuitem></menuchoice>.</para>
+              </listitem>
+
+            </itemizedlist>
+          </listitem>
+		</itemizedlist>
+        <note>
+          <para>Commands cut, copy, paste and delete are also available in the contextual menu diplayed when clicking with the mouse right button.</para>
+        </note>
+	 </sect2>
+
+<!-- ============== To Undo or Redo Edits ====================== -->
+    <sect2 id="hexed-undo-redo-edits">
+      <title>Undoing and Redoing Changes</title>
+      <para>To cancel a change to the file, choose <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Undo</guimenuitem> </menuchoice>. To reverse this cancelling, choose <menuchoice> <guimenu>Edit</guimenu> <guimenuitem>Redo</guimenuitem> </menuchoice>.</para>
+    </sect2>
+
+  </sect1>
+
+  <sect1 id="hexed-find">
+    <title>Finding and Replacing sequences of bytes</title>
+
+    <para>
+      <application>Hexed</application> provides a way to search for a particular sequence of bytes in the file and to replace that sequence of bytes with another. Choose <menuchoice> <guimenu>Search</guimenu><guimenuitem>Find</guimenuitem></menuchoice> to find the location of a particular sequence of bytes or <menuchoice> <guimenu>Search</guimenu><guimenuitem>Replace</guimenuitem></menuchoice> to find and replace a sequence.
+    </para>
+<!-- ============= To Find Text ================================ -->
+    <sect2 id="hexed-find-bytes">
+      <title>Finding a sequences of bytes</title>
+      <para>To search for a particular sequence of bytes in the file, perform the following steps:</para>
+      <orderedlist>
+        <listitem>
+          <para>Choose <menuchoice> <guimenu>Search</guimenu> <guimenuitem>Find</guimenuitem> </menuchoice> to show the <guilabel>Find</guilabel> dialog.</para>
+        </listitem>
+        <listitem>
+          <para>Enter the byte sequence to search for as an hex string in the <guilabel>Enter hex string to find</guilabel> field. Search is incremental: as the sequence is entered one hex character at a time, the page content changes to show the first matching sequence found in the file.</para>
+        </listitem>
+        <listitem>
+          <para>Once the sequence is complete, the first matching sequence d'octets following the cursor is highlighted and the total number of occurences is shown in the statusbar.</para>
+        </listitem>
+        <listitem>
+          <para>To go to the next occurrence of the byte sequence, click on the <guibutton>Next</guibutton> button. To go to the previous occurrence, click on the <guibutton>Prvious</guibutton> button.</para>
+        </listitem>
+      </orderedlist>
+      <note>
+        <para>Since the unit of data in a file is one byte, the byte sequence to search for is considered as the largest even string of hex characters in the <guilabel>Enter hex string to find</guilabel> field. If an extra hex character is entered it is ignored in the search.</para>
+      </note>
+      <para>Once the search is done, you can close the <guilabel>Find</guilabel> dialog and remove the matching sequence highlight by clicking on the <guibutton>x</guibutton> button on the right side.</para>
+    </sect2>
+
+<!-- ============= To Find and Replace Text =================== -->
+    <sect2 id="hexed-find-replace-bytes">
+      <title>Replacing a sequences of bytes</title>
+
+      <para>To replace a particuliar sequence of bytes in the file, perform the following steps:</para>
+      <orderedlist>
+        <listitem>
+          <para>Choose <menuchoice> <guimenu>Search</guimenu> <guimenuitem>Replace</guimenuitem> </menuchoice> to show the <guilabel>Replace</guilabel> dialog.</para>
+          </listitem>
+          <listitem>
+            <para>Enter the sequence of bytes to search for as hex characters in the <guilabel>Enter hex string to find</guilabel>.</para>
+          </listitem>
+          <listitem>
+            <para>Enter in the <guilabel>Replacement hex string</guilabel> field the string of hex characters that should replace the sequence of bytes to search for.</para>
+          </listitem>
+        </orderedlist>
+
+        <para>As in the previous case, search is incremental and the first occurence of the sequence to find is highlighted. Both the string of hex characters to search for and to replace with are truncated to the largest corresponding byte sequence.</para>
+		<para>To examine each occurrence of the matching byte sequence before replacing it, click on <guibutton>Next</guibutton> or on <guibutton>Previous</guibutton>. When a sequence to replace is found, click on <guibutton>Replace</guibutton> pour overwrite it with the replacement sequence. <application>Hexed</application>  moves automatically to the next occurrence.</para>
+		<para>To replace unconditionally all matching occurrences in the file, click on the <guibutton>Replace All</guibutton>.</para>
+
+	 </sect2>
+
+<!-- ============= Find and Replace Options ============================ -->
+    <sect2 id="xed-find-options">
+      <title>Find and Replace Options.</title>
+      <para>The <guilabel>Find</guilabel> and <guilabel>Replace</guilabel> dialogs allow to do a circular search, such that when the search reaches one end of the file, it continues from the other end.</para>
+      <itemizedlist>
+        <listitem>
+          <para>To do a circular search, select the circular button, right of the <guibutton>Previous</guibutton> button</para>
+        </listitem>
+        <listitem>
+          <para>To do a non circular search, unselect the circular button, right of the <guibutton>Previous</guibutton> button</para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+<!-- ============= To Position the Cursor on a Specific Line ======================= -->
+    <sect2 id="xed-goto-line">
+      <title>Positioning the Cursor on a Specific Address</title>
+
+      <para>To position the cursor one a specific address in the file, choose <menuchoice> <guimenu>Search</guimenu> <guimenuitem>Go to</guimenuitem> </menuchoice>. The dialog <guilabel>Go to byte</guilabel> pops up.</para>
+      <para>Enter the address where you want to position the cursor to in the <guilabel>Enter byte address in hexadecimal</guilabel>, and the page will scroll to the requested address.</para>
+      <para>Moving the cursor is incremental: as new hex characters are entered, cursor position changes.</para>
+      <itemizedlist>
+        <listitem>
+          <para>To close the dialog and keep the cursor at the specific address, press the <guibutton>Go</guibutton> button.</para>
+        </listitem>
+        <listitem>
+          <para>To close the dialog and return le cursor at its previous position, press the <guibutton>Cancel</guibutton> button.</para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+
+  </sect1>
+
+</article>
+

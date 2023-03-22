@@ -309,6 +309,10 @@ func (wa *workArea)removePage( pageIndex int ) {
     if wa.notebook.GetNPages() == 0 {
         showNoPageVisual()
     }
+    if wa.pages[pageIndex].path != "" {
+        addFileToHistory( wa.pages[pageIndex].path )
+    }
+
     copy ( wa.pages[pageIndex:], wa.pages[pageIndex+1:] )
     wa.pages = wa.pages[0:nPages-1]
 

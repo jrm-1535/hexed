@@ -67,11 +67,7 @@ func initActions( nItems int ) {
     actions["find"] = searchDialog
     actions["replace"] = replaceDialog
     actions["goto"] = gotoDialog
-
-    helpAction := func ( ) {
-        printDebug( "Action: help content called\n" )
-    }
-    actions["contents"] = helpAction
+    actions["contents"] = hexedHelp
     actions["about"] = aboutDialog
 }
 

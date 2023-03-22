@@ -31,6 +31,10 @@ func writePreferenceFile( data []byte ) error {
     return os.WriteFile( filepath.Join( hexedHome, preferencesFile ), data, 0666 )
 }
 
+// preferences are stored as JSON and internally as a map.
+// keys are always strings and values can be strings, float64 (JSON number)
+// altough this is used as well for integers, bool and slices (JSON arrays)
+// of strings
 type preferences map[string]interface{}
 
 func readPreferences( ) {
@@ -79,6 +83,7 @@ const (
     BIG_ENDIAN_NAME = "big_endian"
     BITSTREAM_MSBF = "bitsteam_msbf"
     LANGUAGE_NAME = "language_name"
+    RECENT_FILES = "recent_files"
 )
 
 func writeDefault( ) {
@@ -100,6 +105,7 @@ func writeDefault( ) {
                 BIG_ENDIAN_NAME: true,
                 BITSTREAM_MSBF: true,
                 LANGUAGE_NAME: "American English",
+                RECENT_FILES: make( []string, 0 ),
     }
 
 //    data["created"] = GetNowAsISO8601UTC()
@@ -152,6 +158,24 @@ func getStringPreference ( name string ) string {
     return val
 }
 
+func getStringSlicePreference( name string ) []string {
+    var ( ok bool; val interface{} )
+    if val, ok = pref[name]; ! ok {
+        log.Fatalf( "Preference %s does not exist\n", name )
+    }
+    var slice []interface{}
+    if slice, ok = val.([]interface{}); ! ok {
+        log.Fatalf( "Preference %s is not a slice\n", name )
+    }
+    var stringSlice []string = make([]string, len(slice))
+    for i, v := range slice {
+        if stringSlice[i], ok = v.(string); ! ok {
+            log.Fatalf( "Preference %s is not a slice of strings\n", name )
+        }
+    }
+    return stringSlice
+}
+
 type notifyChange func( name string )
 var notifications map[string][]notifyChange = make(map[string][]notifyChange)
 
@@ -165,19 +189,74 @@ func registerForChanges( name string, callback notifyChange ) {
     }
 }
 
+func setPreference( key string, value interface{} ) {
+
+    switch v := value.(type) {
+    case []string:
+        var interfaceSlice []interface{} = make([]interface{}, len(v))
+        for i := 0; i < len( v ); i++ {
+            interfaceSlice[i] = v[i]
+        }
+        printDebug( "Updating preference: %s to %v\n", key, interfaceSlice )
+        pref[key] = interfaceSlice
+    case string:
+        printDebug( "Updating preference: %s to %v\n", key, value )
+        pref[key] = value
+    case float64:
+        printDebug( "Updating preference: %s to %v\n", key, value )
+        pref[key] = value
+    case bool:
+        printDebug( "Updating preference: %s to %v\n", key, value )
+        pref[key] = value
+
+    default:
+        log.Fatalf("setPreference: unsupported type %T\n", value)
+    }
+
+    if callbacks, ok := notifications[key]; ok {
+        printDebug( "Notifying updated preference: %s\n", key )
+        for _, callback := range( callbacks ) {
+            callback( key )
+        }
+    }
+}
+
+// update takes a map of interfaces (type preferences) and updates the global
+// preferences (pref) with the key, values found in that map. For each existing
+// key in the global preferences, it first checks if the existing value is
+// different from the new value, and overwrites the existing value if it is.
+// If any value has been modified, it then overwrites the preference file.
 func update( d preferences ) {
     updated := false
     for k, v := range d {
-        if pref[k] != v {
-            printDebug( "Updating preference: %s to %v\n", k, v )
-            pref[k] = v
-
-            if callbacks, ok := notifications[k]; ok {
-                printDebug( "Notifying updated preference: %s\n", k )
-                for _, callback := range( callbacks ) {
-                    callback( k )
+        if stringSlice, ok := v.([]string); ok {
+            // special case, which requires manual conversion as the internal
+            // type is []interface{} instead of []string, and as in general
+            // comparing two slices requires deep comparison of slice elements.
+            toUpdate := false
+            internal, ok := pref[k].([]interface{})
+            if ! ok {
+                log.Fatalf( "Update preference: %s with type []string (%T)\n",
+                            k, pref[k] )
+            }
+            if len(stringSlice) != len(internal) {
+                toUpdate = true
+            } else {
+                for i := 0; i < len(stringSlice); i++ {
+                    if stringSlice[i] != internal[i].(string) {
+                        toUpdate = true
+                        break
+                    }
                 }
             }
+            if toUpdate {
+                setPreference( k, stringSlice )
+                updated = true
+            }
+
+        } else if pref[k] != v {
+            // all other cases are basic types, for which equality (=) works.
+            setPreference( k, v )
             updated = true
         }
     }
@@ -195,4 +274,3 @@ func initPreferences( ) {
     }
     readPreferences( )
 }
-

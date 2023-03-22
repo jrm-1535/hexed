@@ -972,6 +972,10 @@ func (pc *pageContext)getDataLinesNYPos( ) ( start, end int64, yPos float64 ) {
 
 func drawDataLines( da *gtk.DrawingArea, cr *cairo.Context ) {
 
+    if nil == da || nil == cr {
+        log.Printf("drawDataLines: called back with nil data area and/or nil cairo context - ignoring\n")
+        return
+    }
     pc := getCurrentPageContext()
     startLine, beyondLine, lineYPos := pc.getDataLinesNYPos( )
     printDebug( "drawDataLines: start=%d, end=%d, yPos=%f\n",
