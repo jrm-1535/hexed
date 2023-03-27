@@ -4,364 +4,183 @@ import (
     "log"
 
     "internal/layout"
-
 	"github.com/gotk3/gotk3/gtk"
-//	"github.com/gotk3/gotk3/glib"
 	"github.com/gotk3/gotk3/gdk"
 )
 
-type accelCode struct {
-    key     uint
-    mod     gdk.ModifierType
-    flag    gtk.AccelFlags
+type menuTextIds struct {
+    title, hint int
 }
 
-type menuItemDef struct {
-    aName       string      // action name (must be unique across menus)
-    accel       accelCode   // shortcut key
-    enable      bool        // initial enable state
-    labelId     int         // base label id
-    hintId      int         // base hint id
-    altLabelId  int         // alternate label id if toggled
-    altHintId   int         // alternate hint id if toggled
-    subMenu     *menuDef    // sub menu definition (nil if dynamically created)
+var menuResIds map[string]menuTextIds
+var protectState bool
+
+func refreshProtectMenuItem( state bool ) {
+    var title, hint string
+    if state {  // protected => item allows switching to non-protected
+        title = localizeText(menuEditModify)
+        hint = localizeText(menuEditModifyHelp)
+    } else {    // non-protected => item allows switching to protected
+        title = localizeText(menuEditFreeze)
+        hint = localizeText(menuEditFreezeHelp)
+    }
+    layout.SetMenuItemTexts( "protect", title, hint )
 }
 
-type menuDef struct {
-    nameId     int
-    items      *[]menuItemDef
+func setProtectedState( state bool ) {
+    protectState = state
+    refreshProtectMenuItem( state )
 }
 
-func getMenuDefs( ) ( nItems int, menuDefs *[]menuDef ) {
+func getMenuDefs( ) ( int, *[]layout.MenuItemDef ) {
 
-    nItems = 0
-    var fileMenuDef = []menuItemDef { 
-        { "new", accelCode{ 'n', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            true, menuFileNew, menuFileNewHelp, -1, -1, nil },
-        { "open", accelCode{ 'o', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            true, menuFileOpen, menuFileOpenHelp, -1, -1, nil },
-        { "", accelCode{ 0, 0, 0 }, 
-            false, -1, -1, -1, -1, nil },
-        { "save", accelCode{ 's', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuFileSave, menuFileSaveHelp, -1, -1, nil },
-        { "saveAs", accelCode{ 's', gdk.CONTROL_MASK | gdk.SHIFT_MASK, gtk.ACCEL_VISIBLE },
-            false, menuFileSaveAs, menuFileSaveAsHelp, -1, -1, nil },
-        { "revert", accelCode{ 0, 0, 0 },
-            false, menuFileRevert, menuFileRevertHelp, -1, -1, nil },
-        { "", accelCode{ 0, 0, 0 },
-            false, -1, -1, -1, -1, nil },
-        { "recent", accelCode{ 0, 0, 0 },
-            false, menuFileRecent, menuFileRecentHelp, -1, -1, nil },
-        { "close", accelCode{ 'w', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuFileClose, menuFileCloseHelp, -1, -1, nil },
-        { "exit", accelCode{ 'q', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            true, menuFileQuit, menuFileQuitHelp, -1, -1, nil },
-    }
-    nItems += len(fileMenuDef)
+    menuResIds = make( map[string]menuTextIds )
+    noAccel := layout.AccelCode{ 0, 0, 0 }
 
-    var editMenuDef = []menuItemDef {
-        { "undo", accelCode{ 'z', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditUndo, menuEditUndoHelp, -1, -1, nil },
-        { "redo", accelCode{ 'z', gdk.CONTROL_MASK | gdk.SHIFT_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditRedo, menuEditRedoHelp, -1, -1, nil },
-        { "", accelCode{ 0, 0, 0 },
-            false, -1, -1, -1, -1, nil },
-        { "protect", accelCode{ 0, 0, 0 },
-            false, menuEditModify, menuEditModifyHelp, menuEditFreeze, menuEditFreezeHelp, nil },
-        { "", accelCode{ 0, 0, 0 },
-            false, -1, -1, -1, -1, nil },
-        { "cut", accelCode{ 'x', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditCut, menuEditCutHelp, -1, -1, nil },
-        { "copy", accelCode{ 'c', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditCopy, menuEditCopyHelp, -1, -1, nil },
-        { "paste", accelCode{ 'v', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditPaste, menuEditPasteHelp, -1, -1, nil },
-        { "delete", accelCode{ gdk.KEY_Delete, 0, gtk.ACCEL_VISIBLE },
-            false, menuEditDelete, menuEditDeleteHelp, -1, -1, nil },
-        { "", accelCode{ 0, 0, 0 },
-            false, -1, -1, -1, -1, nil },
-        { "selectAll", accelCode{ 'a', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditSelect, menuEditSelectHelp, -1, -1, nil },
-        { "explore", accelCode{ 'e', gdk.CONTROL_MASK | gdk.MOD1_MASK, gtk.ACCEL_VISIBLE },
-            false, menuEditExplore, menuEditExploreHelp, -1, -1, nil },
-        { "", accelCode{ 0, 0, 0 },
-            false, -1, -1, -1, -1, nil },
-        { "preferences", accelCode{ 0, 0, 0 },
-            true, menuEditPreferences, menuEditPreferencesHelp, -1, -1, nil },
-    }
-    nItems += len(editMenuDef)
+    separator := layout.MenuItemDef{ "", "", "", nil, nil, noAccel, false }
 
-    var searchMenuDef = []menuItemDef {
-        { "find", accelCode{ 'f', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuSearchFind, menuSearchFindHelp, -1, -1, nil },
-        { "replace", accelCode{ 'h', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuSearchReplace, menuSearchReplaceHelp, -1, -1, nil },
-        { "goto", accelCode{ 'j', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-            false, menuSearchGoto, menuSearchGotoHelp, -1, -1, nil },
-    }
-    nItems += len(searchMenuDef)
+    np := func( ) { newPage( "", false ) }
+    op := func( ) { fileName := openFileName( )
+                        if fileName != "" {
+                            newPage( fileName, false )
+                        }
+                  }
+    xit := func( ) { exitApplication( nil ) }
 
-    var helpMenuDef = []menuItemDef {
-        { "contents", accelCode{ 0, 0, 0 },
-            true, menuHelpContent, menuHelpContentHelp, -1, -1, nil },
-        { "about", accelCode{ 0, 0, 0 },
-            true, menuHelpAbout, menuHelpAboutHelp, -1, -1, nil },
-    }
-    nItems += len(helpMenuDef)
+    menuResIds["new"] = menuTextIds{ menuFileNew, menuFileNewHelp }
+    menuResIds["open"] = menuTextIds{ menuFileOpen, menuFileOpenHelp }
+    menuResIds["save"] = menuTextIds{ menuFileSave, menuFileSaveHelp }
+    menuResIds["saveAs"] = menuTextIds{ menuFileSaveAs, menuFileSaveAsHelp }
+    menuResIds["revert"] = menuTextIds{ menuFileRevert, menuFileRevertHelp }
+    menuResIds["recent"] = menuTextIds{ menuFileRecent, menuFileRecentHelp }
+    menuResIds["close"] = menuTextIds{ menuFileClose, menuFileCloseHelp }
+    menuResIds["exit"] = menuTextIds{ menuFileQuit, menuFileQuitHelp }
 
-    return nItems, &[]menuDef {
-        { menuFile, &fileMenuDef },
-        { menuEdit, &editMenuDef },
-        { menuSearch, &searchMenuDef },
-        { menuHelp, &helpMenuDef },
-    }
-}
-
-var (
-    menuList    *menu                   // main menu bar
-    menuItems   map[string]*menuItem    // menu items mapped by action name
-)
-
-func locateMenuItemByActionName( aName string ) (mi *menuItem) {
-    mi = menuItems[ aName ]
-    if mi == nil {
-        log.Panicf( "Unable to locate menu Item for action %s\n", aName )
-    }
-    return
-}
-
-func addPopupMenuItem( aName string, textId int, fct func() ) {
-    if _, ok := menuItems[aName]; ok {
-        log.Panicf( "addPopupMenuItem: item already exists for action name <%s>\n",
-                    aName )
-    }
-    menuItems[ aName ] = &menuItem{ nil, aName, false, textId, 0, 0, 0 }
-    addAction( aName, fct )
-}
-
-func delPopupMenuItem( aName string ) {
-    printDebug( "delPopupMenuItem: deleting menuItem & action name <%s>\n", aName )
-    delete( menuItems, aName )
-    delAction( aName )
-}
-
-func popupContextMenu( aNames []string, event *gdk.Event ) {
-    popUpMenu, err := gtk.MenuNew()
-	if err != nil {
-		log.Fatal("Unable to create context menu:", err)
-	}
-
-    for _, aName := range aNames {
-        mi := locateMenuItemByActionName( aName )
-        textId := mi.getTextId()
-        printDebug( "Adding menu item %s [action %s]\n",
-                    localizeText(textId), aName )
-        menuItem, err := gtk.MenuItemNewWithLabel( localizeText(textId) )
-        if err != nil {
-            log.Fatal("Unable to create context menu item:", err)
-        }
-        menuItem.Show()
-        printDebug( "connecting action %s (%p)\n",
-                    aName, getActionByName( aName) )
-        menuItem.Connect( "activate", getActionByName( aName) )
-        popUpMenu.Append( menuItem )
-    }
-    popUpMenu.PopupAtPointer( event )
-}
-
-//Because language can change dynamically, menu structure and labels must be saved
-type menuItem struct {
-    gtkItem     *gtk.MenuItem
-    aName       string
-    toggled     bool  // toggled state false => id0, true => id1
-    textId0     int
-    hintId0     int
-    textId1     int
-    hintId1     int
-}
-
-func (mi *menuItem)getTextId() (tid int) {
-    if mi.toggled {
-        tid = mi.textId1
-    } else {
-        tid = mi.textId0
-    }
-    return
-}
-
-func (mi *menuItem)getHintId() (hid int) {
-    if mi.toggled {
-        hid = mi.hintId1
-    } else {
-        hid = mi.hintId0
-    }
-    return
-}
-
-type menu struct {
-    next        *menu
-    gtkMenuItem *gtk.MenuItem
-    textId      int
-    mItems      []*menuItem
-}
-
-// refresh menus after language change
-func refreshMenus( ) {
-    for mn := menuList; mn != nil; mn = mn.next {
-        printDebug( "refreshMenus: menu: %v\n", mn )
-        mn.gtkMenuItem.SetLabel( localizeText( mn.textId ) )
-        for _, mi := range mn.mItems {
-            mi.gtkItem.SetLabel( localizeText( mi.getTextId() ) )
-        }
-    }
-}
-
-// enable or disable individual menu item. The argument aName  uniquely
-// identifies the menu item across all menus. 
-func enableMenuItem( aName string, enable bool ) {
-    printDebug("Enabling menu item for %s action: %v\n", aName, enable )
-    mi := locateMenuItemByActionName( aName )
-    mi.gtkItem.SetSensitive( enable )
-}
-
-func isMenuItemEnabled( aName string ) bool {
-    mi := locateMenuItemByActionName( aName )
-    return mi.gtkItem.GetSensitive()
-}
-
-// change item toggle state, switching item label from textId 0 to textId 1 or
-// back ro textId 0. return the new toggle state
-func toggleMenuItemState( aName string ) (state bool) {
-    mi := locateMenuItemByActionName( aName )
-    if mi.textId1 != -1 {
-        mi.toggled = ! mi.toggled
-        mi.gtkItem.SetLabel( localizeText( mi.getTextId() ) )
-        state = mi.toggled
-    }
-    return
-}
-
-func setMenuItemState( aName string, state bool ) {
-    mi := locateMenuItemByActionName( aName )
-    mi.toggled = state
-    mi.gtkItem.SetLabel( localizeText( mi.getTextId() ) )
-}
-
-func newMenuItem( itemDef *menuItemDef, shortCuts *gtk.AccelGroup ) *menuItem {
-    gmi, err := gtk.MenuItemNewWithLabel( localizeText( itemDef.labelId ) )
-    if err != nil {
-        log.Fatalf( "Unable to create a GTK MenuItem: %v\n", err )
+    var fileMenuDef = []layout.MenuItemDef {
+        { "new", localizeText(menuFileNew), localizeText(menuFileNewHelp),
+          nil, np, layout.AccelCode{ 'n', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+          true },
+        { "open", localizeText(menuFileOpen), localizeText(menuFileOpenHelp),
+          nil, op, layout.AccelCode{ 'o', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+          true },
+        separator,
+        { "save", localizeText(menuFileSave), localizeText(menuFileSaveHelp),
+          nil, saveCurrentPage, layout.AccelCode{ 's', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "saveAs", localizeText(menuFileSaveAs), localizeText(menuFileSaveAsHelp),
+          nil, saveCurrentPageAs, layout.AccelCode{ 's', gdk.CONTROL_MASK |
+          gdk.SHIFT_MASK, gtk.ACCEL_VISIBLE }, false },
+        { "revert", localizeText(menuFileRevert), localizeText(menuFileRevertHelp),
+          nil, revertCurrentPage, noAccel, false },
+        separator,
+        { "recent", localizeText(menuFileRecent), localizeText(menuFileRecentHelp),
+          nil, nil, noAccel, false },
+        { "close", localizeText(menuFileClose), localizeText(menuFileCloseHelp),
+          nil, closeCurrentPage, layout.AccelCode{ 'w', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "exit", localizeText(menuFileQuit), localizeText(menuFileQuitHelp),
+          nil, xit, layout.AccelCode{ 'q', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+          true },
     }
 
-    gmi.SetSensitive( itemDef.enable )
-    if itemDef.accel.key != 0 {
-        gmi.AddAccelerator( "activate", shortCuts, itemDef.accel.key,
-                            itemDef.accel.mod, itemDef.accel.flag )
+    prtct := func( ) {
+        setProtectedState( ! protectState )     // toggle state
+        temporarilySetReadOnly( protectState )
     }
 
-    actionName := itemDef.aName
-    if nil != getActionByName(actionName) {
-        menuAction := func( ) {
-            clearMenuHint()
-            printDebug( "action %s called\n", actionName )
-            act( actionName )
-        }
-        gmi.Connect( "activate", menuAction )
-    }
-    mItem := new( menuItem )
-    mItem.gtkItem = gmi
-    mItem.toggled = false
-    mItem.textId0 = itemDef.labelId
-    mItem.hintId0 = itemDef.hintId
-    mItem.textId1 = itemDef.altLabelId
-    mItem.hintId1 = itemDef.altHintId
-    // TODO: add support for submenus
-
-    gmi.Connect( "enter-notify-event",
-                func ( gmi *gtk.MenuItem ) {
-                    showMenuHint( localizeText( mItem.getHintId() ) )
-                }  )
-    gmi.Connect( "leave-notify-event", removeMenuHint )
-
-    menuItems[ actionName ] = mItem
-    return mItem
-}
-
-func (m *menu)appendItem( itemDef *menuItemDef,
-                          shortCuts *gtk.AccelGroup ) (item *menuItem) {
-    item = newMenuItem( itemDef, shortCuts )
-    m.mItems = append( m.mItems, item )
-    return
-}
-
-func newMenu( def *menuDef ) (m *menu) {
-    gmi, err := gtk.MenuItemNewWithMnemonic( localizeText(def.nameId) )
-    if err != nil {
-        log.Fatalf( "Unable to create a first level GTK MenuItem: %v\n", err )
+    xpl := func () {
+        showExploreDialog( getBytesAtCaret( 0 ) )
     }
 
-    m = new( menu )
-    m.gtkMenuItem = gmi
-    m.textId = def.nameId
-    m.mItems = make( []*menuItem, 0, 8 )    // most menus use less than 8 items
-    return
-}
+    menuResIds["undo"] = menuTextIds{ menuEditUndo, menuEditUndoHelp }
+    menuResIds["redo"] = menuTextIds{ menuEditRedo, menuEditRedoHelp }
+// "protect" is treated as a special case
+    menuResIds["cut"] = menuTextIds{ menuEditCut, menuEditCutHelp }
+    menuResIds["copy"] = menuTextIds{ menuEditCopy, menuEditCopyHelp }
+    menuResIds["paste"] = menuTextIds{ menuEditPaste, menuEditPasteHelp }
+    menuResIds["delete"] = menuTextIds{ menuEditDelete, menuEditDeleteHelp }
+    menuResIds["selectAll"] = menuTextIds{ menuEditSelect, menuEditSelectHelp }
+    menuResIds["explore"] = menuTextIds{ menuEditExplore, menuEditExploreHelp }
+    menuResIds["preferences"] = menuTextIds{ menuEditPreferences, menuEditPreferencesHelp }
 
-func appendMenu( previous, toAdd *menu ) *menu {
-    if previous != nil {
-        previous.next = toAdd
-    } else {
-        menuList = toAdd
-    }
-    return toAdd
-}
-
-func initMenu( mDef *menuDef, shortCuts *gtk.AccelGroup ) *menu {
-
-    m := newMenu( mDef )
-    gmn, err := gtk.MenuNew( )
-    if err != nil {
-        log.Fatalf( "Unable to create a GTK Menu %v\n", err )
-    }
-
-    for _, iDef := range *mDef.items {
-
-        if iDef.aName != "" {                   // a real item
-            mi := m.appendItem( &iDef, shortCuts )
-            gmn.Add( mi.gtkItem )
-        } else {                                // a separation line
-            gms, err := gtk.SeparatorMenuItemNew( )
-            if err != nil {
-                log.Fatalf( "Unable to create a GTK SeparatorMenuItem: %v\n", err )
-            }
-            gmn.Add( gms )
-        }
-    }
-    m.gtkMenuItem.SetSubmenu( gmn )
-    return m
-}
-
-func initMenuBar( menuDefs *[]menuDef ) *gtk.MenuBar {
-
-    shortCuts, err := gtk.AccelGroupNew()
-    if err != nil {
-        log.Fatalf( "Unable to create a GTK accelerator group: %v\n", err )
-    }
-    setWindowShortcuts( shortCuts )
-
-    menuBar, err := gtk.MenuBarNew()
-    if err != nil {
-        log.Fatalf( "Unable to create a GTK MenuBar: %v\n", err )
+    var editMenuDef = []layout.MenuItemDef {
+        { "undo", localizeText(menuEditUndo), localizeText(menuEditUndoHelp),
+          nil, undoLast, layout.AccelCode{ 'z', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
+          false },
+        { "redo", localizeText(menuEditRedo), localizeText(menuEditRedoHelp),
+          nil, redoLast, layout.AccelCode{ 'z', gdk.CONTROL_MASK | gdk.SHIFT_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        separator,
+        { "protect", localizeText(menuEditModify), localizeText(menuEditModifyHelp),
+          nil, prtct, layout.AccelCode{ 0, 0, 0 }, false },
+        separator,
+        { "cut", localizeText(menuEditCut), localizeText(menuEditCutHelp),
+          nil, cutSelection, layout.AccelCode{ 'x', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "copy", localizeText(menuEditCopy), localizeText(menuEditCopyHelp),
+          nil, copySelection, layout.AccelCode{ 'c', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "paste", localizeText(menuEditPaste), localizeText(menuEditPasteHelp),
+          nil, pasteClipboard, layout.AccelCode{ 'v', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "delete", localizeText(menuEditDelete), localizeText(menuEditDeleteHelp),
+          nil, deleteSelection, layout.AccelCode{ gdk.KEY_Delete, 0,
+          gtk.ACCEL_VISIBLE }, false },
+        separator,
+        { "selectAll", localizeText(menuEditSelect), localizeText(menuEditSelectHelp),
+          nil, selectAll, layout.AccelCode{ 'a', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "explore", localizeText(menuEditExplore), localizeText(menuEditExploreHelp),
+          nil, xpl, layout.AccelCode{ 'e', gdk.CONTROL_MASK | gdk.MOD1_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        separator,
+        { "preferences", localizeText(menuEditPreferences),
+          localizeText(menuEditPreferencesHelp), nil, showPreferencesDialog,
+          layout.AccelCode{ 0, 0, 0 }, true  },
     }
 
-    var previous *menu
-    for _, mDef := range(*menuDefs) {
-        m := initMenu( &mDef, shortCuts )
-        previous = appendMenu( previous, m )
-        menuBar.Append( m.gtkMenuItem )
+    menuResIds["find"] = menuTextIds{ menuSearchFind, menuSearchFindHelp }
+    menuResIds["replace"] = menuTextIds{ menuSearchReplace, menuSearchReplaceHelp }
+    menuResIds["goto"] = menuTextIds{ menuSearchGoto, menuSearchGotoHelp }
+
+    var searchMenuDef = []layout.MenuItemDef {
+        { "find", localizeText(menuSearchFind), localizeText(menuSearchFindHelp),
+          nil, searchDialog, layout.AccelCode{ 'f', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
+        { "replace", localizeText(menuSearchReplace),
+          localizeText(menuSearchReplaceHelp), nil, replaceDialog,
+          layout.AccelCode{ 'h', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE }, false },
+        { "goto", localizeText(menuSearchGoto), localizeText(menuSearchGotoHelp),
+          nil, gotoDialog, layout.AccelCode{ 'j', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, false },
     }
 
-    return menuBar
+    menuResIds["contents"] = menuTextIds{ menuHelpContent, menuHelpContentHelp }
+    menuResIds["about"] = menuTextIds{ menuHelpAbout, menuHelpAboutHelp }
+
+    var helpMenuDef = []layout.MenuItemDef {
+        { "contents", localizeText(menuHelpContent), localizeText(menuHelpContentHelp),
+          nil, hexedHelp, layout.AccelCode{ 0, 0, 0 }, true },
+        { "about", localizeText(menuHelpAbout), localizeText(menuHelpAboutHelp),
+          nil, aboutDialog, layout.AccelCode{ 0, 0, 0 }, true },
+    }
+
+    menuResIds["file"] = menuTextIds{ menuFile, -1 }
+    menuResIds["edit"] = menuTextIds{ menuEdit, -1 }
+    menuResIds["search"] = menuTextIds{ menuSearch, -1 }
+    menuResIds["help"] = menuTextIds{ menuHelp, -1 }
+
+    var menuDef = []layout.MenuItemDef {
+        { "file", localizeText(menuFile), "", &fileMenuDef, nil,
+          layout.AccelCode{ 0, 0, 0 }, true },
+        { "edit", localizeText(menuEdit), "", &editMenuDef, nil,
+          layout.AccelCode{ 0, 0, 0 }, true },
+        { "search", localizeText(menuSearch), "", &searchMenuDef, nil,
+          layout.AccelCode{ 0, 0, 0 }, true },
+        { "help", localizeText(menuHelp), "", &helpMenuDef, nil,
+          layout.AccelCode{ 0, 0, 0 }, true },
+    }
+    return len(menuResIds), &menuDef
 }
 
 const MAX_RECENT_FILES = 10
@@ -380,38 +199,12 @@ func initFileHistory( ) {
     }
 }
 
-func newHistoryMenu( h *layout.History ) *gtk.Menu {
-    recentFiles := h.Get()
-    if len( recentFiles ) == 0 {
-        return nil
-    }
-
-    gmn, err := gtk.MenuNew( )
-    if err != nil {
-        log.Fatalf( "Unable to create a GTK Menu %v\n", err )
-    }
-
-    for _, filePath := range recentFiles {
-        if filePath != "" {
-            gmi, err := gtk.MenuItemNewWithLabel( filePath)
-            if err != nil {
-                log.Fatalf( "Unable to create a GTK MenuItem: %v\n", err )
-            }
-            gmi.SetSensitive( true )
-
-            path := filePath
-            gmi.Connect( "activate", func( ) { newPage( path, false ) } )
-
-            gmi.Connect( "enter-notify-event",
-                        func ( gmi *gtk.MenuItem ) {
-                            showMenuHint( localizeText( menuFileRecentHelp ) + path )
-                        }  )
-            gmi.Connect( "leave-notify-event", removeMenuHint )
-            gmi.Show()
-            gmn.Add( gmi )
-        }
-    }
-    return gmn
+func updateRecentFiles( ) {
+    layout.AttachHistoryMenuToMenuItem( "recent", fileHistory,
+                                        localizeText(menuFileRecentHelp),
+                                        func( path string ) {
+                                            newPage( path, false )
+                                        } )
 }
 
 func addFileToHistory( filePath string ) {
@@ -423,26 +216,115 @@ func addFileToHistory( filePath string ) {
         pref[RECENT_FILES] = v
         update( pref )
 
-        historyMenu := newHistoryMenu( fileHistory )
-        if historyMenu != nil {
-            recentItem := locateMenuItemByActionName( "recent" )
-            recentItem.gtkItem.SetSubmenu( historyMenu )
-            recentItem.gtkItem.SetSensitive( true )
-        }
+        updateRecentFiles()
     }
 }
 
-func buildMenus( ) *gtk.MenuBar {
-    initFileHistory()
-    nItems, menuDefs := getMenuDefs( )
-    menuItems = make( map[string]*menuItem, nItems )
-    initActions( nItems )
-    menuBar := initMenuBar( menuDefs )
-    historyMenu := newHistoryMenu( fileHistory )
-    if historyMenu != nil {
-        recentItem := locateMenuItemByActionName( "recent" )
-        recentItem.gtkItem.SetSubmenu( historyMenu )
-        recentItem.gtkItem.SetSensitive( true )
+type menuHint int
+func (mh * menuHint)Show( hint string ) {
+    showMenuHint( hint )
+}
+
+func (mh * menuHint)Remove( ) {
+    removeMenuHint()
+}
+
+func (mh * menuHint)Clear( ) {
+    clearMenuHint()
+}
+
+// refresh menus after language change
+func refreshMenus( ) {
+    refresh := func( name string ) {
+        if name == "protect" {  // special case
+            refreshProtectMenuItem( protectState )
+            return
+        }
+        nameIds, ok := menuResIds[name]
+        if ! ok {
+            log.Fatalf("refresh menu %s: no such item\n", name)
+        }
+        var title, hint string
+        if nameIds.title != -1 {
+            title = localizeText( nameIds.title )
+        }
+        if nameIds.hint != -1 {
+            hint = localizeText( nameIds.hint )
+        }
+        layout.SetMenuItemTexts( name, title, hint )
     }
-    return menuBar
+    layout.ForEachMenuItemDo( refresh )
+    if fileHistory.Depth() > 0 {
+        updateRecentFiles()
+    }
+}
+
+// initialize menu bar and file history
+func initMenus( protect bool ) (*gtk.AccelGroup, *gtk.MenuBar) {
+    protectState = protect
+    nItems, menuTreeDef := getMenuDefs()
+    accel, menubar := layout.InitMenuBar( nItems, menuTreeDef, (*menuHint)(nil) )
+    initFileHistory()
+    if fileHistory.Depth() > 0 {
+        updateRecentFiles()
+    }
+    return accel, menubar
+}
+
+// The following functions update menus when switching between pages
+func enablePreferences( state bool ) {
+    layout.EnableMenuItem( "preferences", state )
+}
+
+func pageExists( state bool ) {
+    layout.EnableMenuItem( "close", state )
+    if state == false {
+        dataExists( false )
+        selectionDataExists( false, false )
+        undoRedoUpdate( false, false )
+        modificationAllowed( false, false )
+        fileExists( false )
+    }
+}
+
+func fileExists( state bool ) {
+    if layout.IsMenuItemEnabled( "protect" ) {
+        layout.EnableMenuItem( "save", state )
+    }
+    layout.EnableMenuItem( "revert", state )
+}
+
+func explorePossible( state bool ) {
+    layout.EnableMenuItem( "explore", state )
+}
+
+func dataExists( state bool ) {
+    layout.EnableMenuItem( "selectAll", state )
+    if layout.IsMenuItemEnabled( "protect" ) {
+        layout.EnableMenuItem( "saveAs", state )
+    }
+    layout.EnableMenuItem( "find", state )
+    layout.EnableMenuItem( "replace", state )
+    layout.EnableMenuItem( "goto", state )
+}
+
+func pasteDataExists( state bool ) {
+    layout.EnableMenuItem( "paste", state &&
+                    hasPageFocus() && isCurrentPageWritable() )
+}
+
+func selectionDataExists( enableState bool, readOnly bool ) {
+    layout.EnableMenuItem( "copy", enableState && hasPageFocus() )
+    layout.EnableMenuItem( "cut", enableState && ! readOnly && hasPageFocus() )
+    layout.EnableMenuItem( "delete", enableState && ! readOnly &&hasPageFocus() )
+}
+
+func undoRedoUpdate( undo, redo bool ) {
+    layout.EnableMenuItem( "undo", undo )
+    layout.EnableMenuItem( "redo", redo )
+}
+
+func modificationAllowed( enableState, modificationState bool ) {
+    setProtectedState( ! modificationState )
+    layout.EnableMenuItem( "protect", enableState )
 }

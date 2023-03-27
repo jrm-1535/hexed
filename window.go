@@ -13,7 +13,7 @@ import (
 var (
     window          *gtk.Window             // main window
     shortcuts       *gtk.AccelGroup         // menu accelerators
-    menus           *menu                   // a menu bar
+    menuBar         *gtk.MenuBar            // a menu bar
     mainArea        *workArea               // a main work area
     statusBar       *gtk.Statusbar          // a status bar
     menuHintId      uint                    // menu hint area in statusBar
@@ -229,18 +229,7 @@ func temporarilySetReadOnly( readOnly bool ) {
 }
 
 func setWindowShortcuts( accelGroup *gtk.AccelGroup ) {
-    shortcuts = accelGroup
     window.AddAccelGroup( accelGroup )
-}
-
-func addToWindowShortcuts( button *gtk.Button, signal string, key uint,
-                           mods gdk.ModifierType ) {
-    button.AddAccelerator( signal, shortcuts, key, mods, gtk.ACCEL_VISIBLE )
-}
-
-func removeFromWindowShortcuts( button *gtk.Button, key uint,
-                                mods gdk.ModifierType ) {
-    button.RemoveAccelerator( shortcuts, key, mods )
 }
 
 func clearMenuHint( ) {
@@ -671,7 +660,8 @@ func InitApplication( args *hexedArgs ) {
     window.SetTitle("hexed")
     window.SetIconName( "applications-utilities" )
 
-    menuBar := buildMenus( )
+    shortcuts, menuBar = initMenus( true )
+    setWindowShortcuts( shortcuts )
     srArea := newSearchReplaceArea( )
     mainArea = newWorkArea( )
     statusArea := newStatusArea( )

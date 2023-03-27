@@ -6,6 +6,7 @@ import (
 //    "strings"
     "os"
     "internal/edit"
+    "internal/layout"
 
 	"github.com/gotk3/gotk3/gtk"
 	"github.com/gotk3/gotk3/gdk"
@@ -521,7 +522,7 @@ func (pc *pageContext) showContextPopup( event  *gdk.Event ) {
             aNames = []string{ "cut", "copy", "delete" }
         }
     }
-    popupContextMenu( aNames, event )
+    layout.PopupContextMenu( aNames, event )
 }
 
 func moveCaret( da *gtk.DrawingArea, event *gdk.Event ) bool {

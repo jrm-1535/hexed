@@ -1254,10 +1254,10 @@ func makeExploreDialogDef( exp *explore, firstBit int ) interface{} {
                 }
             }
         }
-        addPopupMenuItem( "copyValue", actionCopyValue, copy2Clipboard )
+        layout.AddPopupMenuItem( "copyValue", localizeText(actionCopyValue), copy2Clipboard )
         aNames := []string{ "copyValue" }
-        popupContextMenu( aNames, event )
-        delPopupMenuItem( "copyValue" )
+        layout.PopupContextMenu( aNames, event )
+        layout.DelPopupMenuItem( "copyValue" )
         return true
     }
 
@@ -1311,7 +1311,7 @@ func refreshExploreLanguage( dg *layout.Dialog ) bool {
         exp.lo.SetItemValue( FIRST_BIT_PRM, localizeText(dialogExploreBitStreamFirstBit) )
         exp.lo.SetItemValue( NUMBER_BITS_PRM, localizeText(dialogExploreBitStreamNumberBits) )
         exp.lo.SetItemValue( MSBF_PRM, localizeText(dialogExploreBitStreamMSB) )
-        orderNames, order, orderChanged := exp.getBitOrderControl( )
+                             orderNames, order, orderChanged := exp.getBitOrderControl( )
         exp.lo.SetItemChoices( BITSTREAM_MSBF, orderNames, order, orderChanged )
 
         exp.lo.SetItemTooltip( FIRST_BIT, tooltipSP )
@@ -1330,7 +1330,7 @@ func refreshExploreLanguage( dg *layout.Dialog ) bool {
         exp.lo.SetItemTooltip( UNSIGNED_DEC, tooltipCC )
         exp.lo.SetItemTooltip( SIGNED_DEC, tooltipCC )
 
-        exp.lo.SetItemTooltip( VALUE_HEADER, localizeText(dialogExploreValues) )
+        exp.lo.SetItemValue( VALUE_HEADER, localizeText(dialogExploreValues) )
 
         exp.lo.SetItemValue( ENDIAN_PRM, localizeText(dialogExploreEndian) )
 

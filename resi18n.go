@@ -687,7 +687,7 @@ var textResources [languageNumber]*[arrayLength]string  = [languageNumber]*[arra
 }
 
 func localizeText( textId int ) string {
-    if textId >= arrayLength {
+    if textId < 0 || textId >= arrayLength {
         log.Fatalf( "localizeText: resource index out of range: %d (range 0-%d)\n",
                     textId, arrayLength-1 )
     }
