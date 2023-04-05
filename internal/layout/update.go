@@ -123,6 +123,22 @@ func (lo *Layout) SetButtonActive( name string, state bool ) error {
     return nil
 }
 
+func (lo *Layout)SetButtonIcon( name string, iconName string ) error {
+    format, button, err := lo.getButton( name )
+    if err != nil {
+        return fmt.Errorf("SetButtonIcon: %v\n", err )
+    }
+    if format != nil {
+        return fmt.Errorf("SetButtonIcon: button %s has a label not an icon\n", name)
+    }
+    icon, err := gtk.ImageNewFromIconName( iconName, gtk.ICON_SIZE_BUTTON )
+    if err != nil {
+        return fmt.Errorf("SetButtonIcon: could not create icon image: %v", err)
+    }
+    button.SetImage( icon )
+    return nil
+}
+
 // GetItemTooltip returns the tooltip text associated with the item identified
 // by its definition name, or an error if the given name does not match an item
 // that can have a tooltip.

@@ -187,7 +187,7 @@ func gotoDialog( ) {
 func changed( name string, val interface{} ) bool {
     pref := preferences{}
     pref[name] = val
-    update( pref )
+    updatePreferences( pref )
     return false
 }
 
@@ -736,7 +736,7 @@ func (exp *explore)getBitOrderControl( ) (bitOrderNames []string,
             exp.msbFirst = false
             pref[name] = false
         }
-        update( pref )
+        updatePreferences( pref )
         return exp.updateBitStream( )
     }
     return
@@ -1045,7 +1045,7 @@ func (exp *explore)getEndianessControl( ) (endianNames []string, endian int,
             exp.endian = binary.LittleEndian
             pref[name] = false
         }
-        update( pref )
+        updatePreferences( pref )
         exp.updateValuesWithEndianness( )
         return false
     }

@@ -115,20 +115,21 @@ type RowDef struct {
         always true for a press button, the toggle state for a toggle button.
 */
 
-// Constant item definition (text, integer or boolean)
+// Constant item definition (text, integer, boolean or nothing/nil )
 type ConstDef struct {          // constant field (ouput only)
-    Name        string          // internal name to get or set the text
+    Name        string          // internal name to get or set the value
+                                // (unused in case of separator)
     Padding     uint            // left padding in parent box or cell
-    Value       interface{}     // bool, int, string
+    Value       interface{}     // string, int, bool or nil for separator
     ToolTip     string          // possible constant description
     Format      *TextFmt        // presentation format (int & string)
 }
 
 // Input item definition (text, integer, boolean or button)
 type InputDef struct {          // user modifiable field
-    Name        string          // use to manipulate item after creation
+    Name        string          // used to manipulate item after creation
     Padding     uint            // left padding in parent box or cell
-    Value       interface{}     // initial value (bool, int, string, or
+    Value       interface{}     // initial value (string, int, bool, or
                                 // initial button label (textDef or iconDef)
     ToolTip     string          // input help for users
     Changed     func( name string, val interface{} ) bool // change notification
@@ -215,8 +216,9 @@ type StrList struct {
     KeyPress    func( name string, key uint, mod KeyModifier) bool
 }
 
-// Button behavior control (press or toggle)
+// Button behavior control (enabled, press or toggle)
 type ButtonCtl struct {
+    Enable      bool            // initial enabled state
     Toggle      bool            // whether button press toggles its state
     Initial     bool            // if toggle, initial toggle state
 }
@@ -241,10 +243,12 @@ func makeButtonInput( def *InputDef ) (*itemReference, error ) {
     var (
         tb *gtk.ToggleButton
         b *gtk.Button
+        f *TextFmt
         err error
     )
     switch v := def.Value.(type) {
     case *TextDef:
+        f = v.Format
         if control.Toggle  {
             tb, err = gtk.ToggleButtonNewWithLabel( v.Text )
             if err != nil {
@@ -252,7 +256,7 @@ func makeButtonInput( def *InputDef ) (*itemReference, error ) {
                 fmt.Errorf("makeButtonInput: can't create toggle button with label: %v", err)
             }
             tb.SetActive( control.Initial )
-
+            b = &tb.Button
         } else {
             b, err = gtk.ButtonNewWithLabel( v.Text )
             if err != nil {
@@ -283,6 +287,7 @@ func makeButtonInput( def *InputDef ) (*itemReference, error ) {
     default:
         return nil, fmt.Errorf( "addButtonItem: unknown button type %T\n", v )
     }
+    b.SetSensitive( control.Enable )
     if def.Changed != nil {
         if control.Toggle {
             toggled := func( button *gtk.ToggleButton ) bool {
@@ -298,9 +303,9 @@ func makeButtonInput( def *InputDef ) (*itemReference, error ) {
         }
     }
     if control.Toggle {
-        return &itemReference{ nil, false, tb }, nil
+        return &itemReference{ f, false, tb }, nil
     }
-    return &itemReference{ nil, false, b }, nil
+    return &itemReference{ f, false, b }, nil
 }
 
 func makeTextInput( def *InputDef ) (*itemReference, error) {
@@ -737,9 +742,29 @@ func (lo *Layout) addConstBool( def *ConstDef ) (*itemReference, error) {
     return &iRef, nil
 }
 
-func (lo *Layout) addConstItem( def *ConstDef ) (*itemReference, error) {
+func (lo *Layout) addSeparator( boxOr Orientation ) (*itemReference, error) {
+    // parent box orientation determines the separator orientation:
+    // within a vertical box, separator must be horizontal and within a
+    // horizontal box. separator must be vertical
+    if boxOr == VERTICAL {
+        boxOr = HORIZONTAL
+    } else {
+        boxOr = VERTICAL
+    }
+    sep, err := gtk.SeparatorNew( gtk.Orientation(boxOr) )
+    if err != nil {
+        return nil, fmt.Errorf("addSeparator: cannot create separatpr: %v", err)
+    }
+    // no need to addItem since we have no name and no tooltip
+    return &itemReference{ nil, false, sep }, nil
+}
+
+func (lo *Layout) addConstItem( def *ConstDef,
+                                boxOr Orientation ) (*itemReference, error) {
     var ( err error; itemRef *itemReference )
     switch val := def.Value.(type) {
+    case nil:
+        itemRef, err = lo.addSeparator( boxOr )
     case bool:
         itemRef, err = lo.addConstBool( def )
     case int:
@@ -792,7 +817,7 @@ func (lo *Layout)addBoxItem( def * BoxDef ) (*itemReference, error) {
         case *GridDef:
             itemRef, err = lo.addGridItem( itemDef )
         case *ConstDef:
-            itemRef, err = lo.addConstItem( itemDef )
+            itemRef, err = lo.addConstItem( itemDef, def.Direction )
         case *InputDef:
             itemRef, err = lo.addInputItem( itemDef )
         default:
@@ -842,8 +867,8 @@ func (lo *Layout)addItemToGrid( dg *DataGrid, c, r int,
         itemRef, err = lo.addBoxItem( itemDef )
     case *GridDef:
         itemRef, err = lo.addGridItem( itemDef )
-    case *ConstDef:
-        itemRef, err = lo.addConstItem( itemDef )
+    case *ConstDef: // consider a grid as a horizontal box...
+        itemRef, err = lo.addConstItem( itemDef, HORIZONTAL )
     case *InputDef:
         itemRef, err = lo.addInputItem( itemDef )
     default:
@@ -938,8 +963,8 @@ func NewLayout( def interface{} ) (layout *Layout, err error) {
         itemRef, err = layout.addGridItem( def )
     case *BoxDef:
         itemRef, err = layout.addBoxItem( def )
-    case *ConstDef:
-        itemRef, err = layout.addConstItem( def )
+    case *ConstDef:   // consider single item as within a horizontal box
+        itemRef, err = layout.addConstItem( def, HORIZONTAL )
     case *InputDef:
         itemRef, err = layout.addInputItem( def )
     default:

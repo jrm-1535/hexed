@@ -85,7 +85,7 @@ func newSearchReplaceArea( ) *gtk.Widget {
                                   incrementalSearch, &searchCtl }
 
     butFmt := layout.TextFmt{ layout.REGULAR, layout.CENTER, 0, false, nil }
-    butCtl := layout.ButtonCtl{ false, false }
+    butCtl := layout.ButtonCtl{ true, false, false }
 
     nextLabel := layout.TextDef{ localizeText( buttonNext ), &butFmt }
     searchNext := layout.InputDef{ "next", 0, &nextLabel,
@@ -97,7 +97,7 @@ func newSearchReplaceArea( ) *gtk.Widget {
                                        localizeText(tooltipPrevious),
                                        findPrevious, &butCtl }
 
-    toggleCtl := layout.ButtonCtl{ true, true }
+    toggleCtl := layout.ButtonCtl{ true, true, true }
     wrapLabel := layout.IconDef{ WRAP_AROUND_ICON_NAME }
     wrapAround := layout.InputDef{ "wrapAround", 0, &wrapLabel,
                                    localizeText( tooltipWrapAround ),

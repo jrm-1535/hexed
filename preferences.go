@@ -221,12 +221,12 @@ func setPreference( key string, value interface{} ) {
     }
 }
 
-// update takes a map of interfaces (type preferences) and updates the global
-// preferences (pref) with the key, values found in that map. For each existing
-// key in the global preferences, it first checks if the existing value is
-// different from the new value, and overwrites the existing value if it is.
+// updatePreferences takes a map of interfaces (type preferences) and updates
+// global preferences (pref) with the keys, values found in that map. For each
+// existing key in the global preferences, it first checks if the existing value
+// is different from the new value, and overwrites the existing value if it is.
 // If any value has been modified, it then overwrites the preference file.
-func update( d preferences ) {
+func updatePreferences( d preferences ) {
     updated := false
     for k, v := range d {
         if stringSlice, ok := v.([]string); ok {

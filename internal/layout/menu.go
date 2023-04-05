@@ -74,6 +74,11 @@ func SetMenuItemTexts( name, title, hint string ) {
     }
 }
 
+func GetMenuItemAction( name string ) func() {
+    mi := locateMenuItemByName( name )
+    return mi.action
+}
+
 func ForEachMenuItemDo( f func(name string) ) {
     for name, _ := range menuItems {
         f( name )

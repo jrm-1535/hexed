@@ -14,6 +14,7 @@ var (
     window          *gtk.Window             // main window
     shortcuts       *gtk.AccelGroup         // menu accelerators
     menuBar         *gtk.MenuBar            // a menu bar
+    toolBar         *gtk.Widget             // a tool bar
     mainArea        *workArea               // a main work area
     statusBar       *gtk.Statusbar          // a status bar
     menuHintId      uint                    // menu hint area in statusBar
@@ -662,6 +663,7 @@ func InitApplication( args *hexedArgs ) {
 
     shortcuts, menuBar = initMenus( true )
     setWindowShortcuts( shortcuts )
+    toolBar = initToolbar( )
     srArea := newSearchReplaceArea( )
     mainArea = newWorkArea( )
     statusArea := newStatusArea( )
@@ -672,6 +674,7 @@ func InitApplication( args *hexedArgs ) {
         log.Fatalf( "InitApplication: Unable to create a window box: %v\n", err )
     }
     windowBox.PackStart( menuBar, false, false, 0 )
+    windowBox.PackStart( toolBar, false, false, 0 )
     windowBox.PackStart( srArea, false, false, 0 )
     windowBox.PackStart( mainArea.getBin(), true, true, 1 )
     windowBox.PackStart( statusArea, false, false, 0 )

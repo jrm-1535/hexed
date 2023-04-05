@@ -1226,8 +1226,8 @@ func (pc *pageContext) updateDataGridFromAreaWidth( totalWidth int ) (nBL int, n
     }
     if nBL != pc.nBytesLine {
         nBLPref := preferences{}
-        nBLPref[BYTES_LINE] = nBL
-        update( nBLPref )       // update preferences with new grid def
+        nBLPref[BYTES_LINE] = float64(nBL)
+        updatePreferences( nBLPref )    // update preferences with new grid def
 
         nL = pc.calculateNumberOfLines( nBL )
         printDebug("updateDataGridFromAreaWidth: new nBytesLine=%d, nLines=%d\n", nBL, nL)
