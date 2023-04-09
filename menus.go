@@ -42,6 +42,12 @@ const (
     ENABLE_EXPLORE = false
     ENABLE_PREFERENCES = true
 
+    ENABLE_TOOL_BAR = true
+    ENABLE_STATUS_BAR = true
+    ENABLE_LARGER = false
+    ENABLE_SMALLER = false
+    ENABLE_NORMAL = false
+
     ENABLE_FIND = false
     ENABLE_REPLACE = false
     ENABLE_GOTO = false
@@ -50,12 +56,13 @@ const (
     ENABLE_ABOUT = true
 )
 
-func getMenuDefs( ) ( int, *[]layout.MenuItemDef ) {
+func getMenuDefs( enableStatus, enableTool bool ) (int, *[]layout.MenuItemDef) {
 
     menuResIds = make( map[string]menuTextIds )
     noAccel := layout.AccelCode{ 0, 0, 0 }
 
-    separator := layout.MenuItemDef{ "", "", "", nil, nil, noAccel, false }
+    separator := layout.MenuItemDef{ "", "", "", nil, nil,
+                                     noAccel, false, false, false }
 
     np := func( ) { newPage( "", false ) }
     op := func( ) { fileName := openFileName( )
@@ -77,28 +84,28 @@ func getMenuDefs( ) ( int, *[]layout.MenuItemDef ) {
     var fileMenuDef = []layout.MenuItemDef {
         { "new", localizeText(menuFileNew), localizeText(menuFileNewHelp),
           nil, np, layout.AccelCode{ 'n', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-          ENABLE_NEW },
+          ENABLE_NEW, false, false },
         { "open", localizeText(menuFileOpen), localizeText(menuFileOpenHelp),
           nil, op, layout.AccelCode{ 'o', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-          ENABLE_OPEN },
+          ENABLE_OPEN, false, false },
         separator,
         { "save", localizeText(menuFileSave), localizeText(menuFileSaveHelp),
           nil, saveCurrentPage, layout.AccelCode{ 's', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_SAVE },
+          gtk.ACCEL_VISIBLE }, ENABLE_SAVE, false, false },
         { "saveAs", localizeText(menuFileSaveAs), localizeText(menuFileSaveAsHelp),
           nil, saveCurrentPageAs, layout.AccelCode{ 's', gdk.CONTROL_MASK |
-          gdk.SHIFT_MASK, gtk.ACCEL_VISIBLE }, ENABLE_SAVE_AS },
+          gdk.SHIFT_MASK, gtk.ACCEL_VISIBLE }, ENABLE_SAVE_AS, false, false },
         { "revert", localizeText(menuFileRevert), localizeText(menuFileRevertHelp),
-          nil, revertCurrentPage, noAccel, ENABLE_REVERT },
+          nil, revertCurrentPage, noAccel, ENABLE_REVERT, false, false },
         separator,
         { "recent", localizeText(menuFileRecent), localizeText(menuFileRecentHelp),
-          nil, nil, noAccel, ENABLE_RECENT },
+          nil, nil, noAccel, ENABLE_RECENT, false, false },
         { "close", localizeText(menuFileClose), localizeText(menuFileCloseHelp),
           nil, closeCurrentPage, layout.AccelCode{ 'w', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_CLOSE },
+          gtk.ACCEL_VISIBLE }, ENABLE_CLOSE, false, false },
         { "exit", localizeText(menuFileQuit), localizeText(menuFileQuitHelp),
           nil, xit, layout.AccelCode{ 'q', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-          ENABLE_EXIT },
+          ENABLE_EXIT, false, false },
     }
 
     prtct := func( ) {
@@ -118,60 +125,86 @@ func getMenuDefs( ) ( int, *[]layout.MenuItemDef ) {
     menuResIds["paste"] = menuTextIds{ menuEditPaste, menuEditPasteHelp }
     menuResIds["delete"] = menuTextIds{ menuEditDelete, menuEditDeleteHelp }
     menuResIds["selectAll"] = menuTextIds{ menuEditSelect, menuEditSelectHelp }
-    menuResIds["explore"] = menuTextIds{ menuEditExplore, menuEditExploreHelp }
     menuResIds["preferences"] = menuTextIds{ menuEditPreferences, menuEditPreferencesHelp }
 
     var editMenuDef = []layout.MenuItemDef {
         { "undo", localizeText(menuEditUndo), localizeText(menuEditUndoHelp),
           nil, undoLast, layout.AccelCode{ 'z', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-          ENABLE_UNDO },
+          ENABLE_UNDO, false, false },
         { "redo", localizeText(menuEditRedo), localizeText(menuEditRedoHelp),
           nil, redoLast, layout.AccelCode{ 'z', gdk.CONTROL_MASK | gdk.SHIFT_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_REDO },
+          gtk.ACCEL_VISIBLE }, ENABLE_REDO, false, false },
         separator,
         { "protect", localizeText(menuEditModify), localizeText(menuEditModifyHelp),
-          nil, prtct, layout.AccelCode{ 0, 0, 0 }, ENABLE_PROTECT },
+          nil, prtct, noAccel, ENABLE_PROTECT, false, false },
         separator,
         { "cut", localizeText(menuEditCut), localizeText(menuEditCutHelp),
           nil, cutSelection, layout.AccelCode{ 'x', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_CUT },
+          gtk.ACCEL_VISIBLE }, ENABLE_CUT, false, false },
         { "copy", localizeText(menuEditCopy), localizeText(menuEditCopyHelp),
           nil, copySelection, layout.AccelCode{ 'c', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_COPY },
+          gtk.ACCEL_VISIBLE }, ENABLE_COPY, false, false },
         { "paste", localizeText(menuEditPaste), localizeText(menuEditPasteHelp),
           nil, pasteClipboard, layout.AccelCode{ 'v', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_PASTE },
+          gtk.ACCEL_VISIBLE }, ENABLE_PASTE, false, false },
         { "delete", localizeText(menuEditDelete), localizeText(menuEditDeleteHelp),
           nil, deleteSelection, layout.AccelCode{ gdk.KEY_Delete, 0,
-          gtk.ACCEL_VISIBLE }, ENABLE_DELETE },
+          gtk.ACCEL_VISIBLE }, ENABLE_DELETE, false, false },
         separator,
         { "selectAll", localizeText(menuEditSelect), localizeText(menuEditSelectHelp),
           nil, selectAll, layout.AccelCode{ 'a', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_SELECT_ALL },
-        { "explore", localizeText(menuEditExplore), localizeText(menuEditExploreHelp),
-          nil, xpl, layout.AccelCode{ 'e', gdk.CONTROL_MASK | gdk.MOD1_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_EXPLORE },
+          gtk.ACCEL_VISIBLE }, ENABLE_SELECT_ALL, false, false },
         separator,
         { "preferences", localizeText(menuEditPreferences),
           localizeText(menuEditPreferencesHelp), nil, showPreferencesDialog,
-          layout.AccelCode{ 0, 0, 0 }, ENABLE_PREFERENCES  },
+          noAccel, ENABLE_PREFERENCES, false, false  },
+    }
+
+    menuResIds["toolbar"] = menuTextIds{ menuViewToolbar, menuViewToolbarHelp }
+    menuResIds["statusbar"] = menuTextIds{ menuViewStatusbar, menuViewStatusbarHelp }
+    menuResIds["larger"] = menuTextIds{ menuViewLarger, menuViewLargerHelp }
+    menuResIds["smaller"] = menuTextIds{ menuViewSmaller, menuViewSmallerHelp }
+    menuResIds["normal"] = menuTextIds{ menuViewNormal, menuViewNormalHelp }
+
+    var viewMenuDef = []layout.MenuItemDef {
+        { "toolbar", localizeText(menuViewToolbar),
+          localizeText(menuViewToolbarHelp), nil, updateToolbarVisibility,
+          noAccel, ENABLE_TOOL_BAR, true, enableTool },
+        { "statusbar", localizeText(menuViewStatusbar),
+          localizeText(menuViewStatusbarHelp), nil, updateStatusbarVisibility,
+          noAccel, ENABLE_STATUS_BAR, true, enableStatus },
+        { "larger", localizeText(menuViewLarger), localizeText(menuViewLargerHelp),
+          nil, increaseFontSize, layout.AccelCode{ '+', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, ENABLE_LARGER, false, false },
+        { "smaller", localizeText(menuViewSmaller), localizeText(menuViewSmallerHelp),
+          nil, decreaseFontSize, layout.AccelCode{ '-', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, ENABLE_SMALLER, false, false },
+        { "normal", localizeText(menuViewNormal), localizeText(menuViewNormalHelp),
+          nil, normalFontSize, layout.AccelCode{ '0', gdk.CONTROL_MASK,
+          gtk.ACCEL_VISIBLE }, ENABLE_NORMAL, false, false },
     }
 
     menuResIds["find"] = menuTextIds{ menuSearchFind, menuSearchFindHelp }
     menuResIds["replace"] = menuTextIds{ menuSearchReplace, menuSearchReplaceHelp }
     menuResIds["goto"] = menuTextIds{ menuSearchGoto, menuSearchGotoHelp }
+    menuResIds["explore"] = menuTextIds{ menuSearchExplore, menuSearchExploreHelp }
 
     var searchMenuDef = []layout.MenuItemDef {
         { "find", localizeText(menuSearchFind), localizeText(menuSearchFindHelp),
           nil, searchDialog, layout.AccelCode{ 'f', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_FIND },
+          gtk.ACCEL_VISIBLE }, ENABLE_FIND, false, false },
         { "replace", localizeText(menuSearchReplace),
           localizeText(menuSearchReplaceHelp), nil, replaceDialog,
           layout.AccelCode{ 'h', gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE },
-          ENABLE_REPLACE },
+          ENABLE_REPLACE, false, false },
+        separator,
         { "goto", localizeText(menuSearchGoto), localizeText(menuSearchGotoHelp),
           nil, gotoDialog, layout.AccelCode{ 'j', gdk.CONTROL_MASK,
-          gtk.ACCEL_VISIBLE }, ENABLE_GOTO },
+          gtk.ACCEL_VISIBLE }, ENABLE_GOTO, false, false },
+        separator,
+        { "explore", localizeText(menuSearchExplore), localizeText(menuSearchExploreHelp),
+          nil, xpl, layout.AccelCode{ 'e', gdk.CONTROL_MASK | gdk.MOD1_MASK,
+          gtk.ACCEL_VISIBLE }, ENABLE_EXPLORE, false, false },
     }
 
     menuResIds["contents"] = menuTextIds{ menuHelpContent, menuHelpContentHelp }
@@ -179,27 +212,72 @@ func getMenuDefs( ) ( int, *[]layout.MenuItemDef ) {
 
     var helpMenuDef = []layout.MenuItemDef {
         { "contents", localizeText(menuHelpContent), localizeText(menuHelpContentHelp),
-          nil, hexedHelp, layout.AccelCode{ 0, 0, 0 }, ENABLE_CONTENTS },
+          nil, hexedHelp, noAccel, ENABLE_CONTENTS, false, false },
         { "about", localizeText(menuHelpAbout), localizeText(menuHelpAboutHelp),
-          nil, aboutDialog, layout.AccelCode{ 0, 0, 0 }, ENABLE_ABOUT },
+          nil, aboutDialog, noAccel, ENABLE_ABOUT, false, false },
     }
 
     menuResIds["file"] = menuTextIds{ menuFile, -1 }
     menuResIds["edit"] = menuTextIds{ menuEdit, -1 }
+    menuResIds["view"] = menuTextIds{ menuView, -1 }
     menuResIds["search"] = menuTextIds{ menuSearch, -1 }
     menuResIds["help"] = menuTextIds{ menuHelp, -1 }
 
     var menuDef = []layout.MenuItemDef {
         { "file", localizeText(menuFile), "", &fileMenuDef, nil,
-          layout.AccelCode{ 0, 0, 0 }, true },
+          noAccel, true, false, false },
         { "edit", localizeText(menuEdit), "", &editMenuDef, nil,
-          layout.AccelCode{ 0, 0, 0 }, true },
+          noAccel, true, false, false },
+        { "view", localizeText(menuView), "", &viewMenuDef, nil,
+          noAccel, true, false, false },
         { "search", localizeText(menuSearch), "", &searchMenuDef, nil,
-          layout.AccelCode{ 0, 0, 0 }, true },
+          noAccel, true, false, false },
         { "help", localizeText(menuHelp), "", &helpMenuDef, nil,
-          layout.AccelCode{ 0, 0, 0 }, true },
+          noAccel, true, false, false },
     }
     return len(menuResIds), &menuDef
+}
+
+func updateBarPreferences( name string, state bool ) {
+    pref := preferences{}
+    pref[name] = state
+    updatePreferences( pref )
+}
+
+func updateToolbarVisibility( ) {
+    state := layout.IsMenuItemChecked( "toolbar" )
+    setToolbarVisible( state )
+    updateBarPreferences( TOOL_BAR, state )
+}
+
+func updateStatusbarVisibility() {
+    state := layout.IsMenuItemChecked( "statusbar" )
+    setStatusbarVisible( state )
+    updateBarPreferences( STATUS_BAR, state )
+}
+
+func increaseFontSize() {
+    if incFontSize() {
+        layout.EnableMenuItem( "larger", false )
+    }
+}
+
+func decreaseFontSize() {
+    if decFontSize() {
+        layout.EnableMenuItem( "smaller", false )
+    }
+}
+
+func normalFontSize() {
+    defFontSize()
+    layout.EnableMenuItem( "normal", false )
+}
+
+func setViewFont( ) {
+    minSize, normalSize, maxSize := fontSizeStatus()
+    layout.EnableMenuItem( "larger", ! maxSize )
+    layout.EnableMenuItem( "smaller", ! minSize )
+    layout.EnableMenuItem( "normal", ! normalSize )
 }
 
 const MAX_RECENT_FILES = 10
@@ -229,8 +307,6 @@ func updateRecentFiles( ) {
 func addFileToHistory( filePath string ) {
     v := fileHistory.Update( filePath )
     if len ( v ) != 0 {
-        log.Printf("addFileToHistory: recent files %v\n", v )
-
         pref := preferences{}
         pref[RECENT_FILES] = v
         updatePreferences( pref )
@@ -281,7 +357,10 @@ func refreshMenus( ) {
 // initialize menu bar and file history
 func initMenus( protect bool ) (*gtk.AccelGroup, *gtk.MenuBar) {
     protectState = protect
-    nItems, menuTreeDef := getMenuDefs()
+    enableStatusbar := getBoolPreference( STATUS_BAR )
+    enableToolbar := getBoolPreference( TOOL_BAR )
+
+    nItems, menuTreeDef := getMenuDefs( enableStatusbar, enableToolbar )
     accel, menubar := layout.InitMenuBar( nItems, menuTreeDef, (*menuHint)(nil) )
     initFileHistory()
     if fileHistory.Depth() > 0 {
@@ -402,12 +481,6 @@ func initToolbar( ) *gtk.Widget {
                                 localizeText(menuEditPasteHelp),
                                 action, &pasteButCtl }
 
-    exploreButCtl := layout.ButtonCtl{ ENABLE_EXPLORE, false, false }
-    exploreLabel := layout.IconDef{ EXPLORE_ICON_NAME }
-    exploreb := layout.InputDef{ "explore", 0, &exploreLabel,
-                                localizeText(menuEditExploreHelp),
-                                action, &exploreButCtl }
-
     findButCtl := layout.ButtonCtl{ ENABLE_FIND, false, false }
     findLabel := layout.IconDef{ FIND_ICON_NAME }
     findb := layout.InputDef{ "find", 0, &findLabel,
@@ -419,7 +492,13 @@ func initToolbar( ) *gtk.Widget {
                                 localizeText(menuSearchReplaceHelp),
                                 action, &replaceButCtl }
 
-    lo, err := layout.NewLayout( &layout.BoxDef{ "", 5, 5, 0, "", false,
+    exploreButCtl := layout.ButtonCtl{ ENABLE_EXPLORE, false, false }
+    exploreLabel := layout.IconDef{ EXPLORE_ICON_NAME }
+    exploreb := layout.InputDef{ "explore", 0, &exploreLabel,
+                                localizeText(menuSearchExploreHelp),
+                                action, &exploreButCtl }
+
+    lo, err := layout.NewLayout( &layout.BoxDef{ "", 0, 0, 0, "", false,
                                  layout.HORIZONTAL, []interface{}{
                                                          &openb, &saveb,
                                                          &sep,
@@ -429,9 +508,9 @@ func initToolbar( ) *gtk.Widget {
                                                          &sep,
                                                          &cutb, &copyb, &pasteb,
                                                          &sep,
-                                                         &exploreb,
-                                                         &sep,
                                                          &findb, &replaceb,
+                                                         &sep,
+                                                         &exploreb,
                                                        } } )
     if err != nil {
         log.Fatalf( "initToolbar: unable to create the toolbar layout: %v", err )

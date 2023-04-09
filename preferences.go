@@ -84,12 +84,14 @@ const (
     BITSTREAM_MSBF = "bitsteam_msbf"
     LANGUAGE_NAME = "language_name"
     RECENT_FILES = "recent_files"
+    STATUS_BAR = "status_bar"
+    TOOL_BAR = "tool_bar"
 )
 
 func writeDefault( ) {
     data := preferences {
-                FONT_NAME : "Monospace",
-                FONT_SIZE : 15,
+                FONT_NAME : DEFAULT_FONT_NAME,
+                FONT_SIZE : DEFAULT_FONT_SIZE,
                 MIN_BYTES_LINE : 16,
                 LINE_BYTE_INC : 4,
                 MAX_BYTES_LINE: 48,
@@ -106,9 +108,9 @@ func writeDefault( ) {
                 BITSTREAM_MSBF: true,
                 LANGUAGE_NAME: "American English",
                 RECENT_FILES: make( []string, 0 ),
+                STATUS_BAR: true,
+                TOOL_BAR: false,
     }
-
-//    data["created"] = GetNowAsISO8601UTC()
     writePreferences( data )
 }
 

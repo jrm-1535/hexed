@@ -26,12 +26,16 @@ type MenuItemDef struct {
                                 // or if the submenu is dynamically managed)
     Action      func( )         // action associated with the item, if any
     Accel       AccelCode       // shortcut key
+
     Enable      bool            // initial enable state
+    Check       bool            // true if it is a check mark
+    Initial     bool            // if check, initial check state
 }
 
 type menuItem struct {
-    gtkMenuItem *gtk.MenuItem
-    title       string
+//    gtkMenuItem *gtk.MenuItem
+    gtkMenuItem gtk.IMenuItem
+    title       string          // needed by popup menus
     action      func ( )
 }
 
@@ -48,29 +52,56 @@ func locateMenuItemByName( name string ) (mi *menuItem) {
     return
 }
 
-// enable or disable individual menu item. The argument aName  uniquely
-// identifies the menu item across all menus. 
-func EnableMenuItem( name string, enable bool ) {
+func (mi *menuItem) getGtkMenuItem( ) (gmi *gtk.MenuItem) {
+    switch gtkMi := mi.gtkMenuItem.(type) {
+    case *gtk.MenuItem:
+        gmi = gtkMi
+    case *gtk.CheckMenuItem:
+        gmi = &(gtkMi.MenuItem)
+    default:
+        log.Panicf( "Menu Item type %T is not supported\n", gmi )
+    }
+    return
+}
+
+func getGtkMenuItemByName( name string ) (gmi *gtk.MenuItem) {
     mi := locateMenuItemByName( name )
-    mi.gtkMenuItem.SetSensitive( enable )
+    return mi.getGtkMenuItem( )
+}
+
+// enable or disable individual menu item. The argument aName  uniquely
+// identifies the menu item across all menus.
+func EnableMenuItem( name string, enable bool ) {
+    gmi := getGtkMenuItemByName( name )
+    gmi.SetSensitive( enable )
 }
 
 func IsMenuItemEnabled( name string ) bool {
-    mi := locateMenuItemByName( name )
-    return mi.gtkMenuItem.GetSensitive()
+    gmi := getGtkMenuItemByName( name )
+    return gmi.GetSensitive()
 }
+
+func IsMenuItemChecked( name string ) bool {
+    mi := locateMenuItemByName( name )
+    if gcmi, ok := mi.gtkMenuItem.(*gtk.CheckMenuItem); ok {
+        return gcmi.GetActive()
+    }
+    return false
+}
+
 
 func SetMenuItemTexts( name, title, hint string ) {
     mi := locateMenuItemByName( name )
+    gmi := mi.getGtkMenuItem( )
     if title != "" {
-        mi.gtkMenuItem.SetLabel( title )
+        gmi.SetLabel( title )
         mi.title = title
     }
     if hint != "" {
-        mi.gtkMenuItem.Connect( "enter-notify-event",
-                                func ( gmi *gtk.MenuItem ) {
+        gmi.Connect( "enter-notify-event",
+                       func ( gmi *gtk.MenuItem ) {
                                     help.Show( hint )
-                                }  )
+                       }  )
     }
 }
 
@@ -121,15 +152,22 @@ func newMenuItem( def *MenuItemDef, shortCuts *gtk.AccelGroup ) (mi *menuItem) {
     if def.Name == "" {
         log.Panicf("newMenuItem: got an item definition without name: %v\n", def)
     }
-    var ( gmi *gtk.MenuItem; err error )
-    if def.Title == "" {
-        gmi, err = gtk.MenuItemNew( )
-    } else if def.Title[0] == '_' {
-        gmi, err = gtk.MenuItemNewWithMnemonic( def.Title )
-    } else {    // might be ok to use only mnemonic
-        gmi, err = gtk.MenuItemNewWithLabel( def.Title )
+    var ( gmi *gtk.MenuItem; gcmi *gtk.CheckMenuItem; err error )
+    if def.Check {
+        if def.Title == "" {
+            gcmi, err = gtk.CheckMenuItemNew( )
+        } else {
+            gcmi, err = gtk.CheckMenuItemNewWithMnemonic( def.Title )
+        }
+        gcmi.SetActive( def.Initial )
+        gmi = &(gcmi.MenuItem)
+    } else {
+        if def.Title == "" {
+            gmi, err = gtk.MenuItemNew( )
+        } else {
+            gmi, err = gtk.MenuItemNewWithMnemonic( def.Title )
+        }
     }
-
     action := def.Action
     if action != nil {
         menuAction := func( ) {
@@ -142,7 +180,7 @@ func newMenuItem( def *MenuItemDef, shortCuts *gtk.AccelGroup ) (mi *menuItem) {
     hint := def.Hint
     if hint != "" {
         gmi.Connect( "enter-notify-event",
-                    func ( gmi *gtk.MenuItem ) { help.Show( hint ) }  )
+                    func ( ) { help.Show( hint ) }  )
         gmi.Connect( "leave-notify-event", help.Remove )
     }
 
@@ -162,7 +200,11 @@ func newMenuItem( def *MenuItemDef, shortCuts *gtk.AccelGroup ) (mi *menuItem) {
     gmi.SetSensitive( def.Enable )
 
     mi = new( menuItem )
-    mi.gtkMenuItem = gmi
+    if gcmi != nil {
+        mi.gtkMenuItem = gcmi
+    } else {
+        mi.gtkMenuItem = gmi
+    }
     mi.title = def.Title
     mi.action = action
 
@@ -180,7 +222,7 @@ func newGtkMenu( itemDefs *[]MenuItemDef, shortCuts *gtk.AccelGroup ) *gtk.Menu 
 
         if smiDef.Name != "" {                    // a real item
             smi := newMenuItem( &smiDef, shortCuts )
-            gmn.Add( smi.gtkMenuItem )
+            gmn.Add( smi.getGtkMenuItem() )
         } else {                                // a separation line
             gms, err := gtk.SeparatorMenuItemNew( )
             if err != nil {
@@ -265,11 +307,11 @@ func newGtkHistoryMenu( h *History, leading string,
 
 func AttachHistoryMenuToMenuItem( name string, h *History, leading string,
                                   action func( path string ) ) {
-    mi := locateMenuItemByName( name )
+    gmi := getGtkMenuItemByName( name )
     if h.Depth() > 0 {
-        mi.gtkMenuItem.SetSubmenu( newGtkHistoryMenu( h, leading, action ) )
-        mi.gtkMenuItem.SetSensitive( true )
+        gmi.SetSubmenu( newGtkHistoryMenu( h, leading, action ) )
+        gmi.SetSensitive( true )
     } else {
-        mi.gtkMenuItem.SetSensitive( true )
+        gmi.SetSensitive( true )
     }
 }

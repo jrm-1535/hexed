@@ -355,6 +355,14 @@ func (lo *Layout) SetItemValue( name string, value interface{} ) error {
         return fmt.Errorf("setItemValue: wrong value type %T for toggle button item %s\n",
                           value, name )
 
+    case *gtk.SpinButton:
+        if v, ok := value.(int); ok {
+            item.SetValue( float64(v) )
+            return nil
+        }
+        return fmt.Errorf("setItemValue: wrong value type %T for spin button item %s\n",
+                          value, name )
+
     case *gtk.Button:
         return fmt.Errorf("setItemValue: press button have no value\n")
 

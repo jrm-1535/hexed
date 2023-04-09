@@ -7,10 +7,59 @@ import (
 )
 
 const (
+    DEFAULT_FONT_NAME = "Monospace"
+    DEFAULT_FONT_SIZE = 15
     MIN_FONT_SIZE = 9
     MAX_FONT_SIZE = 25
     FONT_SIZE_INC = 2
 )
+
+func setFontSize( size int ) {
+    pref := preferences{}
+    pref[FONT_SIZE] = float64(size)
+    updatePreferences( pref )
+}
+
+func incFontSize( ) bool {
+    size := getIntPreference( FONT_SIZE )
+    if size < MAX_FONT_SIZE {
+        size += FONT_SIZE_INC
+        setFontSize( size )
+        if size == MAX_FONT_SIZE {
+            return true
+        }
+    }
+    return false
+}
+
+func decFontSize( ) bool {
+    size := getIntPreference( FONT_SIZE )
+    if size > MIN_FONT_SIZE {
+        size -= FONT_SIZE_INC
+        setFontSize( size )
+        if size == MIN_FONT_SIZE {
+            return true
+        }
+    }
+    return false
+}
+
+func defFontSize( ) {
+    setFontSize( DEFAULT_FONT_SIZE )
+}
+
+func fontSizeStatus() (l, n, h bool) {
+    size := getIntPreference( FONT_SIZE )
+    switch size {
+    case MIN_FONT_SIZE:
+        l = true
+    case DEFAULT_FONT_SIZE:
+        n = true
+    case MAX_FONT_SIZE:
+        h = true
+    }
+    return
+}
 
 func getFontNames( ) []string {
     return []string{"Courier 10 Pitch", "Liberation Mono", "Monospace"}
@@ -73,7 +122,7 @@ func setFontContext( ) {
     fontDesc.slant = cairo.FONT_SLANT_NORMAL
     fontDesc.weight = cairo.FONT_WEIGHT_NORMAL
 
-    fontDesc.charWidth, fontDesc.charHeight, fontDesc.charDescent = 
+    fontDesc.charWidth, fontDesc.charHeight, fontDesc.charDescent =
             getCharExtent( fontDesc.face, fontDesc.size,
                            fontDesc.slant, fontDesc.weight )
 }
@@ -81,6 +130,10 @@ func setFontContext( ) {
 func updateFontContext( prefName string ) {
     setFontContext( )
     updatePageForFont( )
+    if prefName == FONT_SIZE {
+        setViewFont( )
+        updatePreferencesDialogFontSize( )
+    }
 }
 
 func initFontContext( ) {

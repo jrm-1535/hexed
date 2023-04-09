@@ -573,6 +573,15 @@ func refreshPreferencesDialogLanguage( ) {
     }
 }
 
+func updatePreferencesDialogFontSize( ) {
+    if preferencesDialog != nil {
+        display, err := preferencesDialog.GetPage( 0 )
+        if err == nil {
+            display.SetItemValue( FONT_SIZE, getIntPreference( FONT_SIZE ) )
+        }
+    }
+}
+
 // --- explore dialog
 
 type explore struct {

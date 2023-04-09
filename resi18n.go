@@ -31,6 +31,7 @@ const (
 
     menuFile
     menuEdit
+    menuView
     menuSearch
     menuHelp
 
@@ -85,11 +86,23 @@ const (
     menuEditSelect
     menuEditSelectHelp
 
-    menuEditExplore
-    menuEditExploreHelp
-
     menuEditPreferences
     menuEditPreferencesHelp
+
+    menuViewToolbar
+    menuViewToolbarHelp
+
+    menuViewStatusbar
+    menuViewStatusbarHelp
+
+    menuViewLarger
+    menuViewLargerHelp
+
+    menuViewSmaller
+    menuViewSmallerHelp
+
+    menuViewNormal
+    menuViewNormalHelp
 
     menuSearchFind
     menuSearchFindHelp
@@ -99,6 +112,9 @@ const (
 
     menuSearchGoto
     menuSearchGotoHelp
+
+    menuSearchExplore
+    menuSearchExploreHelp
 
     menuHelpContent
     menuHelpContentHelp
@@ -298,6 +314,7 @@ var englishRes [arrayLength]string = [arrayLength]string {
     // prefix with '_' for menu shortcut
     "_File",                                                // menuFile
     "_Edit",                                                // menuEdit
+    "_View",                                                // menuView
     "_Search",                                              // menuSearch
     "_Help",                                                // menuHelp
 
@@ -352,11 +369,23 @@ var englishRes [arrayLength]string = [arrayLength]string {
     "Select All",                                           // menuEditSelect
     "select the entire document",                           // menuEditSelectHelp
 
-    "Explore",                                              // menuEditExplore
-    "explore the current selection",                        // menuEditExploreHelp
-
     "Preferences",                                          // menuEditPreferences
     "setup preferences",                                    // menuEditPreferencesHelp
+
+    "Toolbar",                                              // menuViewToolbar
+    "show or hide the toolbar",                             // menuViewToolbarHelp
+
+    "Statusbar",                                            // menuViewStatusbar
+    "show or hide the statusbar",                           // menuViewStatusbarHelp
+
+    "Larger font",                                          // menuViewLarger
+    "increase font size",                                   // menuViewLargerHelp
+
+    "Smaller font",                                         // menuViewSmaller
+    "decrease font size",                                   // menuViewSmallerHelp
+
+    "Normal font size",                                     // menuViewNormal
+    "Set normal font size",                                 // menuViewNormalHelp
 
     "Find",                                                 // menuSearchFind
     "Find a given hex string in file",                      // menuSearchFindHelp
@@ -366,6 +395,9 @@ var englishRes [arrayLength]string = [arrayLength]string {
 
     "Go to",                                                // menuSearchGoto
     "move to the given byte location",                      // menuSearchGotoHelp
+
+    "Explore",                                              // menuSearchExplore
+    "explore the current selection",                        // menuSearchExploreHelp
 
     "Contents",                                             // menuHelpContent
     "show Hexed manual",                                    // menuHelpContentHelp
@@ -500,6 +532,7 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "_Fichier",                                             // menuFile / prefix with '_' for menu shortcut
     "_Edition",                                             // menuEdit
+    "_Vue",                                                 // menuView
     "_Recherche",                                           // menuSearch
     "_Aide",                                                // menuHelp
 
@@ -554,11 +587,23 @@ var frenchRes [arrayLength]string = [arrayLength]string {
     "Selecter tout",                                        // menuEditSelect
     "sélecte the document complet",                         // menuEditSelectHelp
 
-    "Explorer",                                             // menuEditExplore
-    "explorer la selection",                                // menuEditExploreHelp
-
     "Préférences",                                          // menuEditPreferences
     "configure l'application",                              // menuEditPreferencesHelp
+
+    "Barre d'outils",                                       // menuViewToolbar
+    "montre ou cache la barre d'outils",                    // menuViewToolbarHelp
+
+    "Barre d'état",                                         // menuViewStatusbar
+    "montre ou cache la barre d'état",                      // menuViewStatusbarHelp
+
+    "Caractères plus gros",                                 // menuViewLarger
+    "augmente la taille des caractères",                    // menuViewLargerHelp
+
+    "Caractères plus petits",                               // menuViewSmaller
+    "réduit la taille des caractères",                      // menuViewSmallerHelp
+
+    "Caractères normaux",                                   // menuViewNormal
+    "retourne aux caractères de taille normale",            // menuViewNormalHelp
 
     "Trouver",                                              // menuSearchFind
     "Trouve la séquence hexadécimale dans le fichier",      // menuSearchFindHelp
@@ -568,6 +613,9 @@ var frenchRes [arrayLength]string = [arrayLength]string {
 
     "Aller à",                                              // menuSearchGoto
     "Positionne le curseur a l'adresse donnée",             // menuSearchGotoHelp
+
+    "Explorer",                                             // menuSearchExplore
+    "explorer la selection",                                // menuSearchExploreHelp
 
     "Contenu",                                              // menuHelpContent
     "consulte le manuel d'hexed",                           // menuHelpContentHelp

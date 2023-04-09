@@ -16,6 +16,8 @@ var (
     menuBar         *gtk.MenuBar            // a menu bar
     toolBar         *gtk.Widget             // a tool bar
     mainArea        *workArea               // a main work area
+    statusArea      *gtk.Box                // app message & status
+
     statusBar       *gtk.Statusbar          // a status bar
     menuHintId      uint                    // menu hint area in statusBar
     appStatusId     uint                    // app status area in statusBar
@@ -48,6 +50,22 @@ func (pg *page)getPath( ) string {
 
 func (pg *page)getContext( ) *pageContext {
     return pg.context
+}
+
+func setToolbarVisible( visibility bool ) {
+    if visibility {
+        toolBar.Show()
+    } else {
+        toolBar.Hide()
+    }
+}
+
+func setStatusbarVisible( visibility bool ) {
+    if visibility {
+        statusArea.Show()
+    } else {
+        statusArea.Hide()
+    }
 }
 
 func (pg *page)save( ) {
@@ -222,6 +240,9 @@ func closeCurrentPage( ) {
 func showWindow() {
     window.ShowAll()
     hideSearchArea()
+
+    updateStatusbarVisibility()
+    updateToolbarVisibility()
 }
 
 func temporarilySetReadOnly( readOnly bool ) {
@@ -454,6 +475,7 @@ func newPage( pathName string, readOnly bool ) {
     // make sure appendPage is called before activating pageContent
     context.activate( )
     showWindow()
+    setViewFont( )   // set increase/decrease/normal font size view menu items
     mainArea.selectPage( pIndex )
 
     pageExists( true )
@@ -666,7 +688,7 @@ func InitApplication( args *hexedArgs ) {
     toolBar = initToolbar( )
     srArea := newSearchReplaceArea( )
     mainArea = newWorkArea( )
-    statusArea := newStatusArea( )
+    statusArea = newStatusArea( )
 
     // Assemble the window
     windowBox, err := gtk.BoxNew( gtk.ORIENTATION_VERTICAL, 0 )
